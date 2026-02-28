@@ -16,6 +16,7 @@ from marimo._messaging.errors import MarimoExceptionRaisedError, UnknownError
 from marimo._messaging.notification import CellNotification
 from marimo._runtime.commands import ExecuteCellsCommand
 from marimo._schemas.session import NotebookSessionV1
+from marimo._messaging.notification import UpdateCellIdsNotification
 from marimo._session.state.serialize import (
     SessionCacheKey,
     SessionCacheManager,
@@ -1059,3 +1060,290 @@ class TestSessionCacheManager:
             )
             # cache hit: codes and version match
             assert len(loaded_view.cell_notifications) == 2
+
+
+class TestSessionOrderingMismatch:
+    """Tests for cell ordering mismatches between serialization and reload.
+
+    When cell_ids are not set on the SessionView (i.e.
+    UpdateCellIdsNotification was never sent), serialize_session_view
+    falls back to cell_notifications.keys() order, which is insertion
+    (execution) order. If execution order differs from document order,
+    is_cache_hit fails because it does a positional zip comparison of
+    codes against cached cells.
+    """
+
+    def _make_view_with_cells_in_execution_order(self) -> SessionView:
+        """Create a SessionView where cells were executed out of document
+        order.
+
+        Document order: cell_a (x=1), cell_b (y=x+1), cell_c (z=y+1)
+        Execution order: cell_c, cell_a, cell_b (reactive execution)
+        """
+        view = SessionView()
+
+        # Simulate cells arriving in execution order (not document order)
+        # In reactive execution, a downstream cell might complete first
+        for cell_id, code, data in [
+            ("cell_c", "z = y + 1", "3"),
+            ("cell_a", "x = 1", "1"),
+            ("cell_b", "y = x + 1", "2"),
+        ]:
+            view.cell_notifications[CellId_t(cell_id)] = CellNotification(
+                cell_id=CellId_t(cell_id),
+                status="idle",
+                output=CellOutput(
+                    channel=CellChannel.OUTPUT,
+                    mimetype="text/plain",
+                    data=data,
+                ),
+                console=[],
+                timestamp=0,
+            )
+        view.add_control_request(
+            ExecuteCellsCommand(
+                cell_ids=["cell_c", "cell_a", "cell_b"],
+                codes=["z = y + 1", "x = 1", "y = x + 1"],
+            )
+        )
+        return view
+
+    def test_without_cell_ids_serializes_in_execution_order(self):
+        """Without UpdateCellIdsNotification, cells serialize in execution
+        (insertion) order, not document order."""
+        view = self._make_view_with_cells_in_execution_order()
+
+        # cell_ids is None — the pre-#8310 state
+        assert view.cell_ids is None
+
+        result = serialize_session_view(view)
+        serialized_ids = [c["id"] for c in result["cells"]]
+
+        # Cells are in execution/insertion order, not document order
+        assert serialized_ids == ["cell_c", "cell_a", "cell_b"]
+
+    def test_with_cell_ids_serializes_in_document_order(self):
+        """With UpdateCellIdsNotification set, cells serialize in document
+        order regardless of execution order."""
+        view = self._make_view_with_cells_in_execution_order()
+
+        # Simulate the kernel sending UpdateCellIdsNotification (#8310)
+        view.add_notification(
+            UpdateCellIdsNotification(cell_ids=["cell_a", "cell_b", "cell_c"])
+        )
+        assert view.cell_ids is not None
+
+        result = serialize_session_view(view)
+        serialized_ids = [c["id"] for c in result["cells"]]
+
+        # Now cells are in document order
+        assert serialized_ids == ["cell_a", "cell_b", "cell_c"]
+
+    def test_execution_order_mismatch_causes_cache_miss(self):
+        """When cache was written in execution order but is_cache_hit
+        compares against document-order codes, the positional zip fails."""
+        view = self._make_view_with_cells_in_execution_order()
+
+        # cell_ids is None — serialize in execution order
+        assert view.cell_ids is None
+        cached_session = serialize_session_view(view)
+
+        # Document-order codes (what CachingExtension uses as the key)
+        document_order_codes = ("x = 1", "y = x + 1", "z = y + 1")
+
+        manager = SessionCacheManager(SessionView(), None, 0.1)
+        key = SessionCacheKey(
+            codes=document_order_codes,
+            marimo_version=__version__,
+            cell_ids=("cell_a", "cell_b", "cell_c"),
+        )
+
+        # Positional comparison: document-order codes vs execution-order
+        # cells. Position 0: "x = 1" hash != "z = y + 1" hash → miss
+        assert manager.is_cache_hit(cached_session, key) is False
+
+    def test_document_order_serialization_enables_cache_hit(self):
+        """When cell_ids are set correctly, cache is written in document
+        order and is_cache_hit succeeds on reload."""
+        view = self._make_view_with_cells_in_execution_order()
+
+        # Set cell_ids so serialization uses document order
+        view.add_notification(
+            UpdateCellIdsNotification(cell_ids=["cell_a", "cell_b", "cell_c"])
+        )
+        cached_session = serialize_session_view(view)
+
+        document_order_codes = ("x = 1", "y = x + 1", "z = y + 1")
+
+        manager = SessionCacheManager(SessionView(), None, 0.1)
+        key = SessionCacheKey(
+            codes=document_order_codes,
+            marimo_version=__version__,
+            cell_ids=("cell_a", "cell_b", "cell_c"),
+        )
+
+        assert manager.is_cache_hit(cached_session, key) is True
+
+    def test_roundtrip_cache_miss_without_cell_ids(self):
+        """End-to-end: write cache without cell_ids, read back with
+        document-order key → cache miss, no cell outputs restored."""
+        view = self._make_view_with_cells_in_execution_order()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "notebook.py"
+            cache_file = get_session_cache_file(path)
+            cache_file.parent.mkdir(parents=True)
+
+            # Write cache (execution order because cell_ids is None)
+            data = serialize_session_view(view)
+            cache_file.write_text(json.dumps(data))
+
+            # Try to read back with document-order key
+            manager = SessionCacheManager(SessionView(), path, 0.1)
+            loaded_view = manager.read_session_view(
+                SessionCacheKey(
+                    codes=("x = 1", "y = x + 1", "z = y + 1"),
+                    marimo_version=__version__,
+                    cell_ids=("cell_a", "cell_b", "cell_c"),
+                )
+            )
+            # Cache miss — no outputs restored
+            assert len(loaded_view.cell_notifications) == 0
+
+    def test_roundtrip_cache_hit_with_cell_ids(self):
+        """End-to-end: write cache with cell_ids set, read back with
+        document-order key → cache hit, outputs restored."""
+        view = self._make_view_with_cells_in_execution_order()
+        view.add_notification(
+            UpdateCellIdsNotification(cell_ids=["cell_a", "cell_b", "cell_c"])
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "notebook.py"
+            cache_file = get_session_cache_file(path)
+            cache_file.parent.mkdir(parents=True)
+
+            # Write cache (document order because cell_ids is set)
+            data = serialize_session_view(view)
+            cache_file.write_text(json.dumps(data))
+
+            # Read back with document-order key
+            manager = SessionCacheManager(SessionView(), path, 0.1)
+            loaded_view = manager.read_session_view(
+                SessionCacheKey(
+                    codes=("x = 1", "y = x + 1", "z = y + 1"),
+                    marimo_version=__version__,
+                    cell_ids=("cell_a", "cell_b", "cell_c"),
+                )
+            )
+            # Cache hit — all 3 cells restored
+            assert len(loaded_view.cell_notifications) == 3
+            assert "cell_a" in loaded_view.cell_notifications
+            assert "cell_b" in loaded_view.cell_notifications
+            assert "cell_c" in loaded_view.cell_notifications
+
+    def test_cell_count_mismatch_causes_cache_miss(self):
+        """When a cell is added or removed, the cached cell count
+        differs from the key's code count → cache miss."""
+        view = self._make_view_with_cells_in_execution_order()
+        view.add_notification(
+            UpdateCellIdsNotification(cell_ids=["cell_a", "cell_b", "cell_c"])
+        )
+        cached_session = serialize_session_view(view)
+
+        # Reload with an extra cell added to the notebook
+        manager = SessionCacheManager(SessionView(), None, 0.1)
+        key_with_extra_cell = SessionCacheKey(
+            codes=("x = 1", "y = x + 1", "z = y + 1", "w = 4"),
+            marimo_version=__version__,
+            cell_ids=("cell_a", "cell_b", "cell_c", "cell_d"),
+        )
+        assert (
+            manager.is_cache_hit(cached_session, key_with_extra_cell) is False
+        )
+
+        # Reload with a cell removed from the notebook
+        key_with_fewer_cells = SessionCacheKey(
+            codes=("x = 1", "y = x + 1"),
+            marimo_version=__version__,
+            cell_ids=("cell_a", "cell_b"),
+        )
+        assert (
+            manager.is_cache_hit(cached_session, key_with_fewer_cells) is False
+        )
+
+    def test_totally_different_code_causes_cache_miss(self):
+        """When the notebook code is completely rewritten, every positional
+        hash comparison fails → cache miss."""
+        view = self._make_view_with_cells_in_execution_order()
+        view.add_notification(
+            UpdateCellIdsNotification(cell_ids=["cell_a", "cell_b", "cell_c"])
+        )
+        cached_session = serialize_session_view(view)
+
+        # Completely different code
+        manager = SessionCacheManager(SessionView(), None, 0.1)
+        key = SessionCacheKey(
+            codes=("import os", "import sys", "import json"),
+            marimo_version=__version__,
+            cell_ids=("cell_a", "cell_b", "cell_c"),
+        )
+        assert manager.is_cache_hit(cached_session, key) is False
+
+    def test_empty_session_serializes_cells_with_no_code_hash(self):
+        """When cell_ids are set but no cells have been executed,
+        serialized cells have code_hash=None."""
+        view = SessionView()
+        view.add_notification(
+            UpdateCellIdsNotification(cell_ids=["cell_a", "cell_b", "cell_c"])
+        )
+        # No cell_notifications, no last_executed_code — nothing ran yet
+
+        result = serialize_session_view(view)
+
+        assert len(result["cells"]) == 3
+        for cell in result["cells"]:
+            assert cell["code_hash"] is None
+            assert cell["outputs"] == []
+            assert cell["console"] == []
+
+    def test_empty_session_causes_cache_miss_on_reload(self):
+        """A cache written from an empty session (code_hash=None for all
+        cells) will miss when reloaded with actual code."""
+        view = SessionView()
+        view.add_notification(
+            UpdateCellIdsNotification(cell_ids=["cell_a", "cell_b", "cell_c"])
+        )
+        cached_session = serialize_session_view(view)
+
+        manager = SessionCacheManager(SessionView(), None, 0.1)
+        key = SessionCacheKey(
+            codes=("x = 1", "y = x + 1", "z = y + 1"),
+            marimo_version=__version__,
+            cell_ids=("cell_a", "cell_b", "cell_c"),
+        )
+        # _hash_code("x = 1") != None → miss
+        assert manager.is_cache_hit(cached_session, key) is False
+
+    def test_empty_session_deserialize_skips_null_hash_cells(self):
+        """Even if we manually try to deserialize a session with
+        code_hash=None cells, they are skipped — no phantom outputs."""
+        cached_session = serialize_session_view(SessionView())
+        # Manually add a cell with code_hash=None
+        cached_session["cells"].append(
+            {
+                "id": "cell_a",
+                "code_hash": None,
+                "outputs": [
+                    {"type": "data", "data": {"text/plain": "stale"}},
+                ],
+                "console": [],
+            }
+        )
+
+        result = deserialize_session(
+            cached_session,
+            code_hash_to_cell_id={"somehash": CellId_t("cell_a")},
+        )
+        # Cell with code_hash=None is skipped entirely
+        assert len(result.cell_notifications) == 0

@@ -269,9 +269,9 @@ class ExecuteCellsCommand(Command):
         ]
 
     def __post_init__(self) -> None:
-        assert len(self.cell_ids) == len(
-            self.codes
-        ), "Mismatched cell_ids and codes"
+        assert len(self.cell_ids) == len(self.codes), (
+            "Mismatched cell_ids and codes"
+        )
 
 
 class SyncGraphCommand(Command):
@@ -367,9 +367,9 @@ class UpdateUIElementCommand(Command):
         return f"UpdateUIElementCommand(n_elements={len(self.object_ids)}, token={self.token})"
 
     def __post_init__(self) -> None:
-        assert len(self.object_ids) == len(
-            self.values
-        ), "Mismatched object_ids and values"
+        assert len(self.object_ids) == len(self.values), (
+            "Mismatched object_ids and values"
+        )
         # Empty token is not valid (but let's not fail)
         if not self.token:
             LOGGER.warning(
