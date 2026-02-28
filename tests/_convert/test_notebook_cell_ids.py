@@ -131,3 +131,66 @@ def test_snapshot_ids_are_deterministic():
 
     assert ids_1 == ids_2
     assert len(set(ids_1)) == 3  # all unique
+
+
+def test_snapshot_ids_unaffected_by_cell_manager_operations():
+    """Snapshot IDs are generated from a fresh CellIdGenerator, not shared
+    with the kernel's CellManager. Adding/deleting cells mid-session
+    advances the CellManager's generator but must not affect snapshot
+    generation."""
+    from marimo._ast.load import load_notebook_ir
+    from marimo._ast.parse import parse_notebook
+
+    source = dedent(
+        """
+        import marimo
+
+        __generated_with = "0.1.0"
+        app = marimo.App()
+
+        @app.cell
+        def hello():
+            x = 1
+            return (x,)
+
+        @app.cell
+        def world(x):
+            y = x + 1
+            return (y,)
+
+        @app.cell
+        def foo(y):
+            z = y + 1
+            return (z,)
+
+        if __name__ == "__main__":
+            app.run()
+    """
+    ).strip()
+
+    # 1. Load notebook via the kernel path (fresh CellManager)
+    ir = parse_notebook(source)
+    assert ir is not None
+    app = load_notebook_ir(ir, filepath="notebook.py")
+    initial_kernel_ids = list(app._cell_manager.cell_ids())
+
+    # 2. Simulate mid-session add/delete: create several cells
+    #    (advances the CellManager's CellIdGenerator RNG state)
+    extra_ids = [app._cell_manager.create_cell_id() for _ in range(10)]
+    # The generator has now been called 10 extra times
+    assert len(app._cell_manager.seen_ids) > len(initial_kernel_ids)
+
+    # The extra IDs are distinct from the original ones
+    for eid in extra_ids:
+        assert eid not in initial_kernel_ids
+
+    # 3. Generate a snapshot from the same source (fresh generator)
+    snapshot = MarimoConvert.from_py(source).to_notebook_v1()
+    snapshot_ids = [c["id"] for c in snapshot["cells"]]
+
+    # 4. Snapshot IDs must match the initial kernel IDs, unaffected
+    #    by the CellManager's advanced generator state
+    assert snapshot_ids == initial_kernel_ids
+
+    # 5. Also matches a completely fresh kernel simulation
+    assert snapshot_ids == _kernel_cell_ids(source)
