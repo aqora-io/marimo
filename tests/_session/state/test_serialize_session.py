@@ -1129,9 +1129,7 @@ class TestSessionOrderingMismatch:
 
         # Simulate the kernel sending UpdateCellIdsNotification (#8310)
         view.add_notification(
-            UpdateCellIdsNotification(
-                cell_ids=["cell_a", "cell_b", "cell_c"]
-            )
+            UpdateCellIdsNotification(cell_ids=["cell_a", "cell_b", "cell_c"])
         )
         assert view.cell_ids is not None
 
@@ -1171,9 +1169,7 @@ class TestSessionOrderingMismatch:
 
         # Set cell_ids so serialization uses document order
         view.add_notification(
-            UpdateCellIdsNotification(
-                cell_ids=["cell_a", "cell_b", "cell_c"]
-            )
+            UpdateCellIdsNotification(cell_ids=["cell_a", "cell_b", "cell_c"])
         )
         cached_session = serialize_session_view(view)
 
@@ -1219,9 +1215,7 @@ class TestSessionOrderingMismatch:
         document-order key → cache hit, outputs restored."""
         view = self._make_view_with_cells_in_execution_order()
         view.add_notification(
-            UpdateCellIdsNotification(
-                cell_ids=["cell_a", "cell_b", "cell_c"]
-            )
+            UpdateCellIdsNotification(cell_ids=["cell_a", "cell_b", "cell_c"])
         )
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1253,9 +1247,7 @@ class TestSessionOrderingMismatch:
         differs from the key's code count → cache miss."""
         view = self._make_view_with_cells_in_execution_order()
         view.add_notification(
-            UpdateCellIdsNotification(
-                cell_ids=["cell_a", "cell_b", "cell_c"]
-            )
+            UpdateCellIdsNotification(cell_ids=["cell_a", "cell_b", "cell_c"])
         )
         cached_session = serialize_session_view(view)
 
@@ -1266,7 +1258,9 @@ class TestSessionOrderingMismatch:
             marimo_version=__version__,
             cell_ids=("cell_a", "cell_b", "cell_c", "cell_d"),
         )
-        assert manager.is_cache_hit(cached_session, key_with_extra_cell) is False
+        assert (
+            manager.is_cache_hit(cached_session, key_with_extra_cell) is False
+        )
 
         # Reload with a cell removed from the notebook
         key_with_fewer_cells = SessionCacheKey(
@@ -1274,16 +1268,16 @@ class TestSessionOrderingMismatch:
             marimo_version=__version__,
             cell_ids=("cell_a", "cell_b"),
         )
-        assert manager.is_cache_hit(cached_session, key_with_fewer_cells) is False
+        assert (
+            manager.is_cache_hit(cached_session, key_with_fewer_cells) is False
+        )
 
     def test_totally_different_code_causes_cache_miss(self):
         """When the notebook code is completely rewritten, every positional
         hash comparison fails → cache miss."""
         view = self._make_view_with_cells_in_execution_order()
         view.add_notification(
-            UpdateCellIdsNotification(
-                cell_ids=["cell_a", "cell_b", "cell_c"]
-            )
+            UpdateCellIdsNotification(cell_ids=["cell_a", "cell_b", "cell_c"])
         )
         cached_session = serialize_session_view(view)
 
@@ -1301,9 +1295,7 @@ class TestSessionOrderingMismatch:
         serialized cells have code_hash=None."""
         view = SessionView()
         view.add_notification(
-            UpdateCellIdsNotification(
-                cell_ids=["cell_a", "cell_b", "cell_c"]
-            )
+            UpdateCellIdsNotification(cell_ids=["cell_a", "cell_b", "cell_c"])
         )
         # No cell_notifications, no last_executed_code — nothing ran yet
 
@@ -1320,9 +1312,7 @@ class TestSessionOrderingMismatch:
         cells) will miss when reloaded with actual code."""
         view = SessionView()
         view.add_notification(
-            UpdateCellIdsNotification(
-                cell_ids=["cell_a", "cell_b", "cell_c"]
-            )
+            UpdateCellIdsNotification(cell_ids=["cell_a", "cell_b", "cell_c"])
         )
         cached_session = serialize_session_view(view)
 
