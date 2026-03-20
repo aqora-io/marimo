@@ -4,7 +4,9 @@ from __future__ import annotations
 import mimetypes
 import re
 from pathlib import Path
-from typing import TYPE_CHECKING
+import secrets
+from typing import TYPE_CHECKING, Optional
+from urllib.parse import urlparse
 
 from starlette.authentication import requires
 from starlette.exceptions import HTTPException
@@ -225,6 +227,26 @@ async def index(request: Request) -> HTMLResponse:
         or app_state.session_manager.file_router.get_unique_file_key()
     )
 
+    if app_state.enable_csp:
+        nonce = secrets.token_urlsafe(16)
+        csp = {
+            "script-src": [
+                f"'nonce-{nonce}'",
+                "'strict-dynamic'",
+                "'wasm-unsafe-eval'",
+            ],
+        }
+        if app_state.asset_url:
+            url = urlparse(app_state.asset_url)
+            csp["script-src"].append(f"{url.scheme}://{url.netloc}")
+        csp = "; ".join(
+            f"{directive} {' '.join(srcs)}" for directive, srcs in csp.items()
+        )
+        csp_headers = {"Content-Security-Policy": csp}
+    else:
+        nonce = None
+        csp_headers = None
+
     # Try local index.html first, fallback to asset_url if local file doesn't exist
     if index_html.exists():
         html = index_html.read_text()
@@ -251,6 +273,7 @@ async def index(request: Request) -> HTMLResponse:
             server_token=app_state.skew_protection_token,
             mode=app_state.mode,
             asset_url=app_state.asset_url,
+            nonce=nonce,
         )
     else:
         config_manager = app_state.config_manager_at_file(file_key)
@@ -307,15 +330,18 @@ async def index(request: Request) -> HTMLResponse:
             else None,
             asset_url=app_state.asset_url,
             html_head=app_state.html_head,
+            nonce=nonce,
         )
 
         # Inject service worker registration with the notebook ID
-        html = _inject_service_worker(html, file_key)
+        html = _inject_service_worker(html, file_key, nonce=nonce)
 
-    return HTMLResponse(html)
+    return HTMLResponse(html, headers=csp_headers)
 
 
-def _inject_service_worker(html: str, file_key: str) -> str:
+def _inject_service_worker(
+    html: str, file_key: str, *, nonce: Optional[str] = None
+) -> str:
     return inject_script(
         html,
         # Register service worker with the notebook ID
@@ -358,6 +384,7 @@ def _inject_service_worker(html: str, file_key: str) -> str:
                 );
             }}
             """,
+        nonce=nonce,
     )
 
 

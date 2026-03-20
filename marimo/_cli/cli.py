@@ -429,6 +429,13 @@ class _OptionalValueOption(click.Option):
     type=int,
     help="Seconds to wait before closing a session on websocket disconnect. If None is provided, sessions are not automatically closed.",
 )
+@click.option(
+    "--csp/--no-csp",
+    is_flag=True,
+    default=False,
+    type=bool,
+    help="Enable Content-Security-Policy.",
+)
 @click.argument(
     "name",
     required=False,
@@ -459,6 +466,7 @@ def edit(
     asset_url: Optional[str],
     timeout: Optional[float],
     session_ttl: Optional[int],
+    csp: bool,
     name: Optional[str],
     args: tuple[str, ...],
 ) -> None:
@@ -607,6 +615,7 @@ def edit(
         asset_url=asset_url,
         timeout=timeout,
         sandbox_mode=sandbox_mode,
+        enable_csp=csp,
     )
 
 
@@ -1070,6 +1079,13 @@ Example:
     hidden=True,
     help="Custom asset URL for loading static resources. Can include {version} placeholder.",
 )
+@click.option(
+    "--csp/--no-csp",
+    is_flag=True,
+    default=False,
+    type=bool,
+    help="Enable Content-Security-Policy.",
+)
 @click.pass_context
 @click.argument(
     "name",
@@ -1098,6 +1114,7 @@ def run(
     trusted: Optional[bool],
     server_startup_command: Optional[str],
     asset_url: Optional[str],
+    csp: bool,
     name: str,
     args: tuple[str, ...],
 ) -> None:
@@ -1218,6 +1235,7 @@ def run(
         server_startup_command=server_startup_command,
         asset_url=asset_url,
         sandbox_mode=sandbox_mode,
+        enable_csp=csp,
     )
 
 

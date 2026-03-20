@@ -348,4 +348,7 @@ export default defineConfig({
     wasm(),
     topLevelAwait(),
   ],
+  html: {
+    cspNonce: "{{ nonce }}",
+  },
 });

@@ -111,6 +111,12 @@ class AppStateBase:
         return True
 
     @property
+    def enable_csp(self) -> bool:
+        if hasattr(self.state, "enable_csp"):
+            return self.state.enable_csp
+        return False
+
+    @property
     def html_head(self) -> Optional[str]:
         if hasattr(self.state, "html_head"):
             return cast(Optional[str], self.state.html_head)

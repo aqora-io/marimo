@@ -31,6 +31,7 @@ class StarletteServerStateInit:
     mcp_server_enabled: bool
     skew_protection: bool
     enable_auth: bool
+    enable_csp: bool
 
     def apply(self, state: State) -> None:
         for field, value in self.__dict__.items():

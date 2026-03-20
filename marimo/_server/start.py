@@ -183,6 +183,7 @@ def start(
     asset_url: Optional[str] = None,
     timeout: Optional[float] = None,
     sandbox_mode: SandboxMode | None = None,
+    enable_csp: bool = False,
 ) -> None:
     """
     Start the server.
@@ -316,6 +317,7 @@ def start(
         mcp_server_enabled=mcp_enabled,
         skew_protection=skew_protection,
         enable_auth=enable_auth,
+        enable_csp=enable_csp,
     )
     init_state.apply(app.state)
 

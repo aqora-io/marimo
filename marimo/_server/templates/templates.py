@@ -106,6 +106,7 @@ def home_page_template(
     server_token: SkewProtectionToken,
     mode: SessionMode,
     asset_url: Optional[str] = None,
+    nonce: Optional[str] = None,
 ) -> str:
     html = html.replace("{{ base_url }}", base_url)
     html = html.replace("{{ title }}", "marimo")
@@ -117,6 +118,8 @@ def home_page_template(
         "{{ user_config }}", _html_escape(json.dumps(user_config))
     )
     html = html.replace("{{ server_token }}", str(server_token))
+    if nonce:
+        html = html.replace("{{ nonce }}", nonce)
 
     html = _replace_asset_urls(html, asset_url)
 
@@ -227,6 +230,7 @@ def notebook_page_template(
     runtime_config: Optional[list[dict[str, Any]]] = None,
     asset_url: Optional[str] = None,
     html_head: Optional[str] = None,
+    nonce: Optional[str] = None,
 ) -> str:
     html = html.replace("{{ base_url }}", base_url)
 
@@ -313,6 +317,9 @@ def notebook_page_template(
     # Add global HTML head contents if specified (from create_asgi_app)
     if html_head:
         html = html.replace("</head>", f"{html_head}</head>")
+
+    if nonce:
+        html = html.replace("{{ nonce }}", nonce)
 
     # Add per-notebook HTML head file contents if specified
     if app_config.html_head_file:
@@ -544,9 +551,14 @@ def wasm_notebook_template(
     return body
 
 
-def inject_script(html: str, script: str) -> str:
+def inject_script(
+    html: str, script: str, *, nonce: Optional[str] = None
+) -> str:
     """Inject a script into the HTML before the closing body tag."""
-    script_tag = f"<script>{script}</script>"
+    if nonce is None:
+        script_tag = f"<script>{script}</script>"
+    else:
+        script_tag = f'<script nonce="{nonce}">{script}</script>'
     return html.replace("</body>", f"{script_tag}</body>")
 
 
