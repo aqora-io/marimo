@@ -2,6 +2,7 @@
 import type { PropsWithChildren } from "react";
 import type { AppConfig } from "@/core/config/config-schema";
 import { cn } from "@/utils/cn";
+import { useResponsiveEmbedRef } from "../../responsive-embed";
 
 interface Props {
   className?: string;
@@ -17,6 +18,7 @@ export const VerticalLayoutWrapper: React.FC<PropsWithChildren<Props>> = ({
   children,
   innerClassName,
 }) => {
+  const ref = useResponsiveEmbedRef<HTMLDivElement>();
   return (
     <div
       className={cn(
@@ -25,6 +27,7 @@ export const VerticalLayoutWrapper: React.FC<PropsWithChildren<Props>> = ({
         "pb-24 sm:pb-12",
         className,
       )}
+      ref={ref}
     >
       <div
         className={cn(
@@ -32,9 +35,9 @@ export const VerticalLayoutWrapper: React.FC<PropsWithChildren<Props>> = ({
           // This padding needs to be the same from above to be correctly applied
           "pb-24 sm:pb-12",
           appConfig.width === "compact" &&
-            "max-w-(--content-width) sm:min-w-[400px]",
+          "max-w-(--content-width) sm:min-w-[400px]",
           appConfig.width === "medium" &&
-            "max-w-(--content-width-medium) sm:min-w-[400px]",
+          "max-w-(--content-width-medium) sm:min-w-[400px]",
           appConfig.width === "columns" && "w-fit",
           appConfig.width === "full" && "max-w-full",
           // Hide the cells for a fake loading effect, to avoid flickering
