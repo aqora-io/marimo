@@ -57,18 +57,19 @@ export const RunApp: React.FC<AppProps> = ({ appConfig }) => {
 
   const isRunning = useAtomValue(notebookIsRunningAtom);
 
-  const galleryHref = (() => {
-    if (typeof window === "undefined") {
-      return null;
-    }
-    const url = new URL(window.location.href);
-    if (!url.searchParams.has("file")) {
-      return null;
-    }
-    url.searchParams.delete("file");
-    const search = url.searchParams.toString();
-    return search ? `${url.pathname}?${search}` : url.pathname;
-  })();
+  // const galleryHref = (() => {
+  //   if (typeof window === "undefined") {
+  //     return null;
+  //   }
+  //   const url = new URL(window.location.href);
+  //   if (!url.searchParams.has("file")) {
+  //     return null;
+  //   }
+  //   url.searchParams.delete("file");
+  //   const search = url.searchParams.toString();
+  //   return search ? `${url.pathname}?${search}` : url.pathname;
+  // })();
+  const galleryHref = false;
 
   return (
     <AppContainer
