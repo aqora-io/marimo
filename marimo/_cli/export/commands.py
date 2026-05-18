@@ -83,6 +83,7 @@ from marimo._schemas.export_options import (
     WASMMode,
 )
 from marimo._server.utils import asyncio_run
+from marimo._session.state.serialize import get_notebook_cache_file
 from marimo._templates import get_default_asset_url
 from marimo._utils.file_watcher import FileWatcher
 from marimo._utils.marimo_path import MarimoPath
@@ -1272,6 +1273,60 @@ def html_wasm(
     )
 
 
+@click.command(
+    cls=ColoredCommand,
+    help="Export a marimo notebook as a NotebookV1 json.",
+)
+@click.option(
+    "--watch/--no-watch",
+    default=False,
+    type=bool,
+    help=_watch_message,
+)
+@click.option(
+    "-f",
+    "--force",
+    is_flag=True,
+    default=False,
+    help="Force overwrite of the output file if it already exists.",
+)
+@click.option(
+    "-i",
+    "--indent/--no-indent",
+    is_flag=True,
+    default=False,
+    help="Indent JSON output.",
+)
+@click.argument(
+    "name",
+    required=True,
+    type=click.Path(exists=True, file_okay=True, dir_okay=False),
+)
+def json_notebook(watch: bool, force: bool, indent: bool, name: str) -> None:
+    import json
+
+    from marimo._convert import MarimoConvert
+
+    notebook_path = Path(name)
+    output = get_notebook_cache_file(notebook_path)
+
+    def export_callback(file_path: MarimoPath) -> ExportResult:
+        py_notebook = file_path.read_text()
+        json_notebook = json.dumps(
+            MarimoConvert.from_py(py_notebook).to_notebook_v1(),
+            indent=2 if indent else None,
+        )
+        return ExportResult(
+            contents=json_notebook,
+            download_filename=output.name,
+            did_error=False,
+        )
+
+    watch_and_export(
+        MarimoPath(notebook_path), output, watch, export_callback, force
+    )
+
+
 export.add_command(html)
 export.add_command(script)
 export.add_command(md)
@@ -1280,3 +1335,4 @@ export.add_command(pdf)
 export.add_command(html_wasm)
 export.add_command(thumbnail)
 export.add_command(session)
+export.add_command(json_notebook)
