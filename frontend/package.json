@@ -18,7 +18,10 @@
     "src"
   ],
   "exports": {
-    "./unstable_internal/*": "./src/*"
+    "./unstable_internal/*": {
+      "types": "./dist/*",
+      "import": "./src/*"
+    }
   },
   "dependencies": {
     "@ai-sdk/react": "^4.0.40",
