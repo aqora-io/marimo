@@ -4,6 +4,9 @@ import { atom } from "jotai";
 import { Logger } from "@/utils/Logger";
 
 function getVersionFromMountConfig(): string | null {
+  if (import.meta.env.SSR) {
+    return null;
+  }
   try {
     const mountConfig = window.__MARIMO_MOUNT_CONFIG__ as { version: string };
     return mountConfig.version;

@@ -63,7 +63,7 @@ import { VerticalLayoutWrapper } from "./vertical-layout-wrapper";
 type VerticalLayout = null;
 type VerticalLayoutProps = ICellRendererProps<VerticalLayout>;
 
-const VerticalLayoutRenderer: React.FC<VerticalLayoutProps> = ({
+export const VerticalLayoutRenderer: React.FC<VerticalLayoutProps> = ({
   cells,
   appConfig,
   mode,

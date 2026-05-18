@@ -41,6 +41,7 @@ import { Tooltip } from "../ui/tooltip";
 import { CsvViewer } from "./file-tree/renderers";
 import { MarimoTracebackOutput } from "./output/MarimoTracebackOutput";
 import { renderMimeIcon } from "./renderMimeIcon";
+import { isComplexReactNode } from "@/utils/react";
 
 const METADATA_KEY = "__metadata__";
 
@@ -104,6 +105,10 @@ export const OutputRenderer: React.FC<{
   // TODO(akshayka): audio; pdf; text/csv; excel?; text/css; text/javascript
   switch (mimetype) {
     case "text/html":
+      if (import.meta.env.SSR && isComplexReactNode(data)) {
+        return <div className={cn(channel, "block")}>{data}</div>;
+      }
+
       invariant(
         typeof data === "string",
         `Expected string data for mime=${mimetype}. Got ${typeof data}`,
@@ -191,6 +196,10 @@ export const OutputRenderer: React.FC<{
       return <CsvViewer contents={data} />;
     case "text/latex":
     case "text/markdown":
+      if (import.meta.env.SSR && isComplexReactNode(data)) {
+        return <div className={cn(channel, "block")}>{data}</div>;
+      }
+
       invariant(
         typeof data === "string",
         `Expected string data for mime=${mimetype}. Got ${typeof data}`,

@@ -20,7 +20,12 @@ export function isSessionId(value: string | null): value is SessionId {
   return /^s_[\da-z]{6}$/.test(value);
 }
 
-const sessionId = (() => {
+let sessionId: SessionId | undefined;
+
+/**
+ * Resume an existing session or start a new one
+ */
+export function getSessionId(): SessionId {
   const url = new URL(window.location.href);
   const id = url.searchParams.get(
     KnownQueryParams.sessionId,
@@ -38,13 +43,9 @@ const sessionId = (() => {
     Logger.debug("Connecting to existing session", { sessionId: id });
     return id;
   }
-  Logger.debug("Starting a new session", { sessionId: id });
-  return generateSessionId();
-})();
-
-/**
- * Resume an existing session or start a new one
- */
-export function getSessionId(): SessionId {
+  if (typeof sessionId === "undefined") {
+    Logger.debug("Starting a new session", { sessionId: id });
+    sessionId = generateSessionId();
+  }
   return sessionId;
 }

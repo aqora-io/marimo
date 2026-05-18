@@ -58,6 +58,19 @@ export class UIElementRegistry {
     return window[KEY] as UIElementRegistry;
   }
 
+  static get PROXY(): UIElementRegistry {
+    const proxy = new Proxy(
+      {},
+      {
+        get: (_target, prop, _recv) => {
+          // @ts-ignore
+          return UIElementRegistry.INSTANCE[prop];
+        },
+      },
+    );
+    return proxy as UIElementRegistry;
+  }
+
   private constructor() {
     this.entries = new Map();
   }
@@ -237,4 +250,4 @@ export class UIElementRegistry {
   }
 }
 
-export const UI_ELEMENT_REGISTRY = UIElementRegistry.INSTANCE;
+export const UI_ELEMENT_REGISTRY = UIElementRegistry.PROXY;

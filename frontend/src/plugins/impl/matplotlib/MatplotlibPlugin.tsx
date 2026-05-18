@@ -40,6 +40,10 @@ export class MatplotlibPlugin implements IPlugin<T, Data> {
 }
 
 const MatplotlibComponent = (props: MatplotlibState) => {
+  if (import.meta.env.SSR) {
+    return <img src={props.chartBase64} />;
+  }
+
   const ref = useRef<HTMLDivElement>(null);
   const instance = useRef<MatplotlibRenderer | null>(null);
 

@@ -35,7 +35,7 @@ const RunPage = (props: Props) => {
 const Watermark = () => {
   return (
     <div
-      className="fixed bottom-0 right-0 z-50 print:hidden"
+      className="absolute bottom-0 right-0 z-50 print:hidden"
       data-testid="watermark"
     >
       <a

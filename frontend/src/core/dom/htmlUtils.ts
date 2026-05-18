@@ -51,6 +51,9 @@ export function serializeInitialValue(value: unknown) {
 }
 
 export function getFilenameFromDOM() {
+  if (import.meta.env.SSR) {
+    return null;
+  }
   // If running in Islands, just return the window title.
   if (isIslands()) {
     return document.title || null;

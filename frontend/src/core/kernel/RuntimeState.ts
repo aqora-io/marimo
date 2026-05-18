@@ -5,7 +5,7 @@ import {
   MarimoValueReadyEvent,
   type MarimoValueReadyEventType,
 } from "../dom/events";
-import { UI_ELEMENT_REGISTRY, type UIElementRegistry } from "../dom/uiregistry";
+import { UIElementRegistry } from "../dom/uiregistry";
 import type { RunRequests } from "../network/types";
 
 /**
@@ -20,7 +20,7 @@ export class RuntimeState {
   static get INSTANCE(): RuntimeState {
     const KEY = "_marimo_private_RuntimeState";
     if (!window[KEY]) {
-      window[KEY] = new RuntimeState(UI_ELEMENT_REGISTRY);
+      window[KEY] = new RuntimeState(UIElementRegistry.INSTANCE);
     }
     return window[KEY] as RuntimeState;
   }

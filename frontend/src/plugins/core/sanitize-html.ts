@@ -4,7 +4,7 @@ import DOMPurify, { type Config } from "dompurify";
 // preserve target=_blank https://github.com/cure53/DOMPurify/issues/317#issuecomment-912474068
 // Guard for non-browser environments (e.g. Node.js in the marimo-lsp extension)
 // where `document` is not available.
-if (typeof document !== "undefined") {
+if (!import.meta.env.SSR) {
   const TEMPORARY_ATTRIBUTE = "data-temp-href-target";
   DOMPurify.addHook("beforeSanitizeAttributes", (node) => {
     if (node.tagName === "A") {
@@ -53,5 +53,9 @@ export function sanitizeHtml(html: string) {
     // but this is only used for HTML content.
     SAFE_FOR_XML: !html.includes("marimo-mermaid"),
   };
-  return DOMPurify.sanitize(html, sanitizationOptions);
+  if (import.meta.env.SSR) {
+    return DOMPurify(window).sanitize(html, sanitizationOptions);
+  } else {
+    return DOMPurify.sanitize(html, sanitizationOptions);
+  }
 }

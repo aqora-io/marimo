@@ -84,6 +84,8 @@ function setupThemeListener(): void {
 setupThemeListener();
 
 function getVsCodeTheme(): "light" | "dark" | undefined {
+  if (import.meta.env.SSR) return;
+
   const kind = document.body.dataset.vscodeThemeKind;
   switch (kind) {
     case "vscode-dark":
@@ -113,7 +115,9 @@ function setupVsCodeThemeListener() {
   });
   return () => observer.disconnect();
 }
-setupVsCodeThemeListener();
+if (!import.meta.env.SSR) {
+  setupVsCodeThemeListener();
+}
 
 export const resolvedThemeAtom = atom((get) => {
   const theme = get(themeAtom);
