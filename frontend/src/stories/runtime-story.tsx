@@ -113,7 +113,11 @@ function RuntimePreview({
         <div className="flex-1 min-w-0 pt-12">
           <ConnectionNotice appConfig={appConfig} onRetry={reconnect} />
           {notebook.cellIds.inOrderIds.map((cellId) => (
-            <VerticalLayoutWrapper key={cellId} appConfig={appConfig}>
+            <VerticalLayoutWrapper
+              key={cellId}
+              mode="edit"
+              appConfig={appConfig}
+            >
               <Cell
                 cellId={cellId}
                 theme={props.theme}

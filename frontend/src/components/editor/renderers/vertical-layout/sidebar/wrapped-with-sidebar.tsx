@@ -23,7 +23,7 @@ export const WrappedWithSidebar: React.FC<Props> = ({ children }) => {
   const openWidth = normalizeWidth(width);
 
   return (
-    <div className="inset-0 absolute flex">
+    <div className="absolute flex">
       <Sidebar
         isOpen={isOpen}
         width={openWidth}

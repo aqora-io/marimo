@@ -3,8 +3,10 @@ import type { PropsWithChildren } from "react";
 import type { AppConfig } from "@/core/config/config-schema";
 import { cn } from "@/utils/cn";
 import { useResponsiveEmbedRef } from "../../responsive-embed";
+import type { AppMode } from "@/core/mode";
 
 interface Props {
+  mode: AppMode;
   className?: string;
   innerClassName?: string;
   appConfig: AppConfig;
@@ -12,6 +14,7 @@ interface Props {
 }
 
 export const VerticalLayoutWrapper: React.FC<PropsWithChildren<Props>> = ({
+  mode,
   invisible,
   appConfig,
   className,
@@ -22,7 +25,9 @@ export const VerticalLayoutWrapper: React.FC<PropsWithChildren<Props>> = ({
   return (
     <div
       className={cn(
-        "px-1 sm:px-16 md:px-20 xl:px-24 print:px-0 print:pb-0",
+        mode === "read"
+          ? "px-24"
+          : "px-1 sm:px-16 md:px-20 xl:px-24 print:px-0 print:pb-0",
         // Large mobile bottom padding due to mobile browser navigation bar
         "pb-24 sm:pb-12",
         className,

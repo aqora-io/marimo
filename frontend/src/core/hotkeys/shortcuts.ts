@@ -9,7 +9,9 @@ import { NOT_SET } from "./hotkeys";
  */
 export function isPlatformMac() {
   if (typeof window === "undefined") {
-    Logger.warn("isPlatformMac() called without window");
+    if (!import.meta.env.SSR) {
+      Logger.warn("isPlatformMac() called without window");
+    }
     return false;
   }
 
@@ -27,7 +29,9 @@ export function isPlatformMac() {
  */
 export function isPlatformWindows() {
   if (typeof window === "undefined") {
-    Logger.warn("isPlatformWindows() called without window");
+    if (!import.meta.env.SSR) {
+      Logger.warn("isPlatformWindows() called without window");
+    }
     return false;
   }
   // @ts-expect-error typescript does not have types for experimental userAgentData property

@@ -59,6 +59,7 @@ export const ConnectionNotice = ({
       notice?.ready && notice.kind === "startup" ? "Ready" : notice?.title;
     return (
       <VerticalLayoutWrapper
+        mode="edit"
         appConfig={appConfig}
         // Sandboxes retain this row for subsequent environment syncs.
         className="shrink-0 h-12 pb-0 sm:pb-0 print:hidden"
@@ -98,6 +99,7 @@ export const ConnectionNotice = ({
   const showSteps = hasStartupStages(notice);
   return (
     <VerticalLayoutWrapper
+      mode="edit"
       appConfig={appConfig}
       className="shrink-0 pb-0 sm:pb-0 print:hidden"
       innerClassName="pb-0 sm:pb-0 pr-4"
