@@ -207,10 +207,10 @@ importers:
         version: 4.25.11(@codemirror/autocomplete@6.20.3)(@codemirror/language@6.12.4)(@codemirror/state@6.7.1)(@codemirror/view@6.43.9)(@lezer/common@1.5.2)(@lezer/highlight@1.2.3)(@lezer/javascript@1.5.1)(@lezer/lr@1.4.10)
       '@uiw/react-codemirror':
         specifier: 4.25.11
-        version: 4.25.11(@babel/runtime@7.27.6)(@codemirror/autocomplete@6.20.3)(@codemirror/language@6.12.4)(@codemirror/lint@6.9.7)(@codemirror/search@6.7.1)(@codemirror/state@6.7.1)(@codemirror/theme-one-dark@6.1.3)(@codemirror/view@6.43.9)(codemirror@6.0.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+        version: 4.25.11(@babel/runtime@7.29.7)(@codemirror/autocomplete@6.20.3)(@codemirror/language@6.12.4)(@codemirror/lint@6.9.7)(@codemirror/search@6.7.1)(@codemirror/state@6.7.1)(@codemirror/theme-one-dark@6.1.3)(@codemirror/view@6.43.9)(codemirror@6.0.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@uiw/react-json-view':
         specifier: 2.0.0-alpha.43
-        version: 2.0.0-alpha.43(@babel/runtime@7.27.6)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+        version: 2.0.0-alpha.43(@babel/runtime@7.29.7)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@uwdata/flechette':
         specifier: ^1.1.2
         version: 1.1.2
@@ -348,7 +348,7 @@ importers:
         version: 1.16.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       react-codemirror-merge:
         specifier: 4.25.11
-        version: 4.25.11(@babel/runtime@7.27.6)(@codemirror/autocomplete@6.20.3)(@codemirror/language@6.12.4)(@codemirror/lint@6.9.7)(@codemirror/search@6.7.1)(@codemirror/state@6.7.1)(@codemirror/theme-one-dark@6.1.3)(@codemirror/view@6.43.9)(codemirror@6.0.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+        version: 4.25.11(@babel/runtime@7.29.7)(@codemirror/autocomplete@6.20.3)(@codemirror/language@6.12.4)(@codemirror/lint@6.9.7)(@codemirror/search@6.7.1)(@codemirror/state@6.7.1)(@codemirror/theme-one-dark@6.1.3)(@codemirror/view@6.43.9)(codemirror@6.0.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       react-dnd:
         specifier: ^16.0.1
         version: 16.0.1(@types/node@24.13.3)(@types/react@19.2.18)(react@19.2.8)
@@ -373,6 +373,9 @@ importers:
       react-resizable-panels:
         specifier: 2.1.9
         version: 2.1.9(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      react-syntax-highlighter:
+        specifier: ^16.1.1
+        version: 16.1.1(react@19.2.8)
       react-use-event-hook:
         specifier: ^0.9.6
         version: 0.9.6(react@19.2.8)
@@ -500,6 +503,9 @@ importers:
       '@types/react-dom':
         specifier: ^19.2.5
         version: 19.2.5(@types/react@19.2.18)
+      '@types/react-syntax-highlighter':
+        specifier: ^15.5.13
+        version: 15.5.13
       '@types/timestring':
         specifier: ^6.0.5
         version: 6.0.5
@@ -789,6 +795,10 @@ packages:
 
   '@babel/runtime@7.27.6':
     resolution: {integrity: sha512-vbavdySgbTTrmFE+EsiqUTzlOr5bzlnJtUv9PynGCAKvfQqjIXbvFdumPM/GxMDfyuGMJaJAU6TO4zc1Jf1i8Q==}
+    engines: {node: '>=6.9.0'}
+
+  '@babel/runtime@7.29.7':
+    resolution: {integrity: sha512-Nq8OhGWiZIZGV6hLHoyAKLLcJihP/xFeBMGJoUrxTX2psI8dCifzLhZISFb+VWS3wFMRDmCGw5R+dOySCqPLhw==}
     engines: {node: '>=6.9.0'}
 
   '@babel/template@7.28.6':
@@ -4658,6 +4668,9 @@ packages:
   '@types/plotly.js@2.35.16':
     resolution: {integrity: sha512-krUVNut/+kd5Q8p10bFwv3e61s96s0HEIBMSbNCgCxgQ7FwzJW3ByRlO6cDBeTVEUQNPdPt/ZftlfrBLaX7uFg==}
 
+  '@types/prismjs@1.26.6':
+    resolution: {integrity: sha512-vqlvI7qlMvcCBbVe0AKAb4f97//Hy0EBTaiW8AalRnG/xAN5zOiWWyrNqNXeq8+KAuvRewjCVY1+IPxk4RdNYw==}
+
   '@types/react-dom@19.2.5':
     resolution: {integrity: sha512-fMPwH9v7r/pp43yUd2/Mbiex5KouJwwR3dzHkhLREUC6764VyDsqxhAxv6OFEYR1RhjOyD1naqba8ECDBe7ZQg==}
     peerDependencies:
@@ -4665,6 +4678,9 @@ packages:
 
   '@types/react-grid-layout@1.3.6':
     resolution: {integrity: sha512-Cw7+sb3yyjtmxwwJiXtEXcu5h4cgs+sCGkHwHXsFmPyV30bf14LeD/fa2LwQovuD2HWxCcjIdNhDlcYGj95qGA==}
+
+  '@types/react-syntax-highlighter@15.5.13':
+    resolution: {integrity: sha512-uLGJ87j6Sz8UaBAooU0T6lWJ0dBmjZgN1PZTrj05TNql2/XpC6+4HhMT5syIdFUUt+FASfCeLLv4kBygNU+8qA==}
 
   '@types/react@19.2.18':
     resolution: {integrity: sha512-AnzbBERsrLKtk2XSfTbYRLjQPdy116Sty4q+T+Bp3IC4l6jNBvreVPAHmpq9qhXQM7CXZPjLVmGMw9sy+hxQ3w==}
@@ -6305,6 +6321,9 @@ packages:
   fastq@1.19.1:
     resolution: {integrity: sha512-GwLTyxkCXjXbxqIhTsMI2Nui8huMPtnxg7krajPJAjnEG/iiOS7i+zCtWGZR9G0NBKbXKh6X9m9UIsYX/N6vvQ==}
 
+  fault@1.0.4:
+    resolution: {integrity: sha512-CJ0HCB5tL5fYTEA7ToAq5+kTwd++Borf1/bifxd9iT70QcXr4MRrO3Llf8Ifs70q+SJcGHFtnIE/Nw6giCtECA==}
+
   fdir@6.5.0:
     resolution: {integrity: sha512-tIbYtZbucOs0BRGqPJkshJUYdL+SDH7dVM8gjy+ERp3WAUjLEFJE+02kanyHtwjWOnwrKYBiwAmM0p4kLJAnXg==}
     engines: {node: '>=12.0.0'}
@@ -6369,6 +6388,10 @@ packages:
   form-data@4.0.6:
     resolution: {integrity: sha512-vKatAh4SlVfgbv+YtmhiRjhEMJsYpsG1Y2rMQtR+SVSbytsSD1YGzDIcrAJmdFec88u/+VoGmxnl+80gL1tRCQ==}
     engines: {node: '>= 6'}
+
+  format@0.2.2:
+    resolution: {integrity: sha512-wzsgA6WOq+09wrU1tsJ09udeR/YZRaeArL9e1wPbFg3GG2yDnC2ldKpxs4xunpFF9DgqCqOIra3bc1HWrJ37Ww==}
+    engines: {node: '>=0.4.x'}
 
   forwarded@0.2.0:
     resolution: {integrity: sha512-buRG0fpBtRHSTCOASe6hD258tEubFoRLb4ZNA6NxMVHNw2gOcwHo9wyablzMzOA5z9xA9L1KNjk/Nt6MT9aYow==}
@@ -6637,6 +6660,12 @@ packages:
 
   headers-polyfill@5.0.1:
     resolution: {integrity: sha512-1TJ6Fih/b8h5TIcv+1+Hw0PDQWJTKDKzFZzcKOiW1wJza3XoAQlkCuXLbymPYB8+ZQyw8mHvdw560e8zVFIWyA==}
+
+  highlight.js@10.7.3:
+    resolution: {integrity: sha512-tzcUFauisWKNHaRkN4Wjl/ZA07gENAjFl3J/c480dprkGTg5EQstgaNFqBfUqCq54kZRIEcreTsAgF/m2quD7A==}
+
+  highlightjs-vue@1.0.0:
+    resolution: {integrity: sha512-PDEfEF102G23vHmPhLyPboFCD+BkMGu+GuJe2d9/eH4FsCwvgBpnc9n0pGE+ffKdph38s6foEZiEjdgHdzp+IA==}
 
   hoist-non-react-statics@3.3.2:
     resolution: {integrity: sha512-/gGivxi8JPKWNm/W0jSmzcMPpfpPLc3dY/6GxhX2hQ9iGj3aDfklV4ET7NjKpSinLpJ5vafa9iiGIEZg10SfBw==}
@@ -7325,6 +7354,9 @@ packages:
 
   loupe@3.2.1:
     resolution: {integrity: sha512-CdzqowRJCeLU72bHvWqwRBBlLcMEtIvGrlvef74kMnV2AolS9Y8xUv1I0U/MNAWMhBlKIoyuEgoJ0t/bbwHbLQ==}
+
+  lowlight@1.20.0:
+    resolution: {integrity: sha512-8Ktj+prEb1RoCPkEOrPMYUN/nCggB7qAWe3a7OpMjWQkh3l2RD5wKRQ+o8Q8YuI9RG/xs95waaI/E6ym/7NsTw==}
 
   lru-cache@10.4.3:
     resolution: {integrity: sha512-JNAzZcXrCt42VGLuYz0zfAzDfAvJWW6AfYlDBQyDV5DClI2m5sAmK+OIO7s59XfsRsWHp02jAJrRadPRGTt6SQ==}
@@ -8262,6 +8294,10 @@ packages:
     resolution: {integrity: sha512-Qb1gy5OrP5+zDf2Bvnzdl3jsTf1qXVMazbvCoKhtKqVs4/YK4ozX4gKQJJVyNe+cajNPn0KoC0MC3FUmaHWEmQ==}
     engines: {node: ^10.13.0 || ^12.13.0 || ^14.15.0 || >=15.0.0}
 
+  prismjs@1.30.0:
+    resolution: {integrity: sha512-DEvV2ZF2r2/63V+tK8hQvrR2ZGn10srHbXviTlcv7Kpzw8jWiNTqbVgjO3IY8RxrrOUF8VPMQQFysYYYv0YZxw==}
+    engines: {node: '>=6'}
+
   probe-image-size@7.2.3:
     resolution: {integrity: sha512-HubhG4Rb2UH8YtV4ba0Vp5bQ7L78RTONYu/ujmCu5nBI8wGv24s4E9xSKBi0N1MowRpxk76pFCpJtW0KPzOK0w==}
 
@@ -8543,6 +8579,12 @@ packages:
       '@types/react':
         optional: true
 
+  react-syntax-highlighter@16.1.1:
+    resolution: {integrity: sha512-PjVawBGy80C6YbC5DDZJeUjBmC7skaoEUdvfFQediQHgCL7aKyVHe57SaJGfQsloGDac+gCpTfRdtxzWWKmCXA==}
+    engines: {node: '>= 16.20.2'}
+    peerDependencies:
+      react: ^19.2.8
+
   react-use-event-hook@0.9.6:
     resolution: {integrity: sha512-wNchkFrrlz64QQOJOf5+dFjy+27bJEwtS1SgliRXVsU60wo3pSntNRlwDws2qPHwrAP/wlm5IyQHBlPCya0JIQ==}
     peerDependencies:
@@ -8613,6 +8655,9 @@ packages:
 
   redux@5.0.1:
     resolution: {integrity: sha512-M9/ELqF6fy8FwmkpnF0S3YKOqMyoWJ4+CS5Efg2ct3oY9daQvd/Pc71FpGZsVsbl3Cpb+IIcjBDUnnyBdQbq4w==}
+
+  refractor@5.0.0:
+    resolution: {integrity: sha512-QXOrHQF5jOpjjLfiNk5GFnWhRXvxjUVnlFxkeDmewR5sXkr3iM46Zo+CnRR8B+MDVqkULW4EcLVcRBNOPXHosw==}
 
   regl-error2d@2.0.12:
     resolution: {integrity: sha512-r7BUprZoPO9AbyqM5qlJesrSRkl+hZnVKWKsVp7YhOl/3RIpi4UDGASGJY0puQ96u5fBYw/OlqV24IGcgJ0McA==}
@@ -10296,6 +10341,8 @@ snapshots:
       '@babel/types': 7.29.8
 
   '@babel/runtime@7.27.6': {}
+
+  '@babel/runtime@7.29.7': {}
 
   '@babel/template@7.28.6':
     dependencies:
@@ -14502,11 +14549,17 @@ snapshots:
 
   '@types/plotly.js@2.35.16': {}
 
+  '@types/prismjs@1.26.6': {}
+
   '@types/react-dom@19.2.5(@types/react@19.2.18)':
     dependencies:
       '@types/react': 19.2.18
 
   '@types/react-grid-layout@1.3.6':
+    dependencies:
+      '@types/react': 19.2.18
+
+  '@types/react-syntax-highlighter@15.5.13':
     dependencies:
       '@types/react': 19.2.18
 
@@ -14626,9 +14679,9 @@ snapshots:
       - '@lezer/javascript'
       - '@lezer/lr'
 
-  '@uiw/react-codemirror@4.25.11(@babel/runtime@7.27.6)(@codemirror/autocomplete@6.20.3)(@codemirror/language@6.12.4)(@codemirror/lint@6.9.7)(@codemirror/search@6.7.1)(@codemirror/state@6.7.1)(@codemirror/theme-one-dark@6.1.3)(@codemirror/view@6.43.9)(codemirror@6.0.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
+  '@uiw/react-codemirror@4.25.11(@babel/runtime@7.29.7)(@codemirror/autocomplete@6.20.3)(@codemirror/language@6.12.4)(@codemirror/lint@6.9.7)(@codemirror/search@6.7.1)(@codemirror/state@6.7.1)(@codemirror/theme-one-dark@6.1.3)(@codemirror/view@6.43.9)(codemirror@6.0.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
     dependencies:
-      '@babel/runtime': 7.27.6
+      '@babel/runtime': 7.29.7
       '@codemirror/commands': 6.11.0
       '@codemirror/state': 6.7.1
       '@codemirror/theme-one-dark': 6.1.3
@@ -14643,9 +14696,9 @@ snapshots:
       - '@codemirror/lint'
       - '@codemirror/search'
 
-  '@uiw/react-json-view@2.0.0-alpha.43(@babel/runtime@7.27.6)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
+  '@uiw/react-json-view@2.0.0-alpha.43(@babel/runtime@7.29.7)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
     dependencies:
-      '@babel/runtime': 7.27.6
+      '@babel/runtime': 7.29.7
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
 
@@ -16281,6 +16334,10 @@ snapshots:
     dependencies:
       reusify: 1.1.0
 
+  fault@1.0.4:
+    dependencies:
+      format: 0.2.2
+
   fdir@6.5.0(picomatch@4.0.5):
     optionalDependencies:
       picomatch: 4.0.5
@@ -16362,6 +16419,8 @@ snapshots:
       es-set-tostringtag: 2.1.0
       hasown: 2.0.4
       mime-types: 2.1.35
+
+  format@0.2.2: {}
 
   forwarded@0.2.0: {}
 
@@ -16759,6 +16818,10 @@ snapshots:
     dependencies:
       '@types/set-cookie-parser': 2.4.10
       set-cookie-parser: 3.1.2
+
+  highlight.js@10.7.3: {}
+
+  highlightjs-vue@1.0.0: {}
 
   hoist-non-react-statics@3.3.2:
     dependencies:
@@ -17326,6 +17389,11 @@ snapshots:
   loro-crdt@1.15.1: {}
 
   loupe@3.2.1: {}
+
+  lowlight@1.20.0:
+    dependencies:
+      fault: 1.0.4
+      highlight.js: 10.7.3
 
   lru-cache@10.4.3: {}
 
@@ -18643,6 +18711,8 @@ snapshots:
       ansi-styles: 5.2.0
       react-is: 17.0.2
 
+  prismjs@1.30.0: {}
+
   probe-image-size@7.2.3:
     dependencies:
       lodash.merge: 4.6.2
@@ -18891,14 +18961,14 @@ snapshots:
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
 
-  react-codemirror-merge@4.25.11(@babel/runtime@7.27.6)(@codemirror/autocomplete@6.20.3)(@codemirror/language@6.12.4)(@codemirror/lint@6.9.7)(@codemirror/search@6.7.1)(@codemirror/state@6.7.1)(@codemirror/theme-one-dark@6.1.3)(@codemirror/view@6.43.9)(codemirror@6.0.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8):
+  react-codemirror-merge@4.25.11(@babel/runtime@7.29.7)(@codemirror/autocomplete@6.20.3)(@codemirror/language@6.12.4)(@codemirror/lint@6.9.7)(@codemirror/search@6.7.1)(@codemirror/state@6.7.1)(@codemirror/theme-one-dark@6.1.3)(@codemirror/view@6.43.9)(codemirror@6.0.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8):
     dependencies:
-      '@babel/runtime': 7.27.6
+      '@babel/runtime': 7.29.7
       '@codemirror/merge': 6.12.2
       '@codemirror/state': 6.7.1
       '@codemirror/theme-one-dark': 6.1.3
       '@codemirror/view': 6.43.9
-      '@uiw/react-codemirror': 4.25.11(@babel/runtime@7.27.6)(@codemirror/autocomplete@6.20.3)(@codemirror/language@6.12.4)(@codemirror/lint@6.9.7)(@codemirror/search@6.7.1)(@codemirror/state@6.7.1)(@codemirror/theme-one-dark@6.1.3)(@codemirror/view@6.43.9)(codemirror@6.0.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@uiw/react-codemirror': 4.25.11(@babel/runtime@7.29.7)(@codemirror/autocomplete@6.20.3)(@codemirror/language@6.12.4)(@codemirror/lint@6.9.7)(@codemirror/search@6.7.1)(@codemirror/state@6.7.1)(@codemirror/theme-one-dark@6.1.3)(@codemirror/view@6.43.9)(codemirror@6.0.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       codemirror: 6.0.2
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
@@ -19111,6 +19181,16 @@ snapshots:
     optionalDependencies:
       '@types/react': 19.2.18
 
+  react-syntax-highlighter@16.1.1(react@19.2.8):
+    dependencies:
+      '@babel/runtime': 7.29.7
+      highlight.js: 10.7.3
+      highlightjs-vue: 1.0.0
+      lowlight: 1.20.0
+      prismjs: 1.30.0
+      react: 19.2.8
+      refractor: 5.0.0
+
   react-use-event-hook@0.9.6(react@19.2.8):
     dependencies:
       react: 19.2.8
@@ -19203,6 +19283,13 @@ snapshots:
       '@babel/runtime': 7.27.6
 
   redux@5.0.1: {}
+
+  refractor@5.0.0:
+    dependencies:
+      '@types/hast': 3.0.4
+      '@types/prismjs': 1.26.6
+      hastscript: 9.0.1
+      parse-entities: 4.0.2
 
   regl-error2d@2.0.12:
     dependencies:

@@ -1,46 +1,24 @@
 /* Copyright 2026 Marimo. All rights reserved. */
 
-import { markdown } from "@codemirror/lang-markdown";
-import { sql } from "@codemirror/lang-sql";
-import {
-  defaultHighlightStyle,
-  syntaxHighlighting,
-} from "@codemirror/language";
-import CodeMirror, {
-  EditorView,
-  type ReactCodeMirrorProps,
-} from "@uiw/react-codemirror";
+import { LightAsync as SyntaxHighlighter } from "react-syntax-highlighter";
+import lightSyntaxHighlight from "react-syntax-highlighter/dist/esm/styles/hljs/stackoverflow-dark";
+import darkSyntaxHighlight from "react-syntax-highlighter/dist/esm/styles/hljs/stackoverflow-light";
 import { CopyIcon, EyeIcon, EyeOffIcon, PlusIcon } from "lucide-react";
-import { memo, useMemo, useState } from "react";
+import { memo, useState } from "react";
 import { useAddCodeToNewCell } from "@/components/editor/cell/useAddCell";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { toast } from "@/components/ui/use-toast";
-import type { LanguageAdapterType } from "@/core/codemirror/language/types";
-import { customPythonLanguageSupport } from "@/core/codemirror/language/languages/python";
-import { darkTheme } from "@/core/codemirror/theme/dark";
-import { lightTheme } from "@/core/codemirror/theme/light";
-import { useTheme } from "@/theme/useTheme";
 import { cn } from "@/utils/cn";
 import { copyToClipboard } from "@/utils/copy";
 import { Events } from "@/utils/events";
+import { useTheme } from "@/theme/useTheme";
 
-const pythonExtensions = [
-  customPythonLanguageSupport(),
-  EditorView.lineWrapping,
-];
-const sqlExtensions = [sql(), EditorView.lineWrapping];
-const markdownExtensions = [markdown(), EditorView.lineWrapping];
+const supportedLanguages = Object.freeze(["python", "sql", "markdown"] as const);
+export type SupportedLanguage = (typeof supportedLanguages)[number];
 
-function readonlyCodeExtensions(language: LanguageAdapterType) {
-  switch (language) {
-    case "sql":
-      return sqlExtensions;
-    case "markdown":
-      return markdownExtensions;
-    default:
-      return pythonExtensions;
-  }
+export function isLanguageSupported(language: string): language is SupportedLanguage {
+  return (supportedLanguages as readonly string[]).includes(language);
 }
 
 /**
@@ -54,17 +32,17 @@ function readonlyCodeExtensions(language: LanguageAdapterType) {
  * @param props.language - The language of the code. Default is "python".
  */
 export const ReadonlyCode = memo(
-  (
-    props: {
-      className?: string;
-      code: string;
-      initiallyHideCode?: boolean;
-      showHideCode?: boolean;
-      showCopyCode?: boolean;
-      insertNewCell?: boolean;
-      language?: LanguageAdapterType;
-    } & ReactCodeMirrorProps,
-  ) => {
+  (props: {
+    className?: string;
+    code: string;
+    initiallyHideCode?: boolean;
+    showHideCode?: boolean;
+    showCopyCode?: boolean;
+    insertNewCell?: boolean;
+    language?: SupportedLanguage;
+    minHeight?: string | number;
+    maxHeight?: string | number;
+  }) => {
     const { theme } = useTheme();
     const {
       code,
@@ -74,18 +52,8 @@ export const ReadonlyCode = memo(
       showCopyCode = true,
       insertNewCell,
       language = "python",
-      ...rest
     } = props;
     const [hideCode, setHideCode] = useState(!!initiallyHideCode);
-
-    const extensions = useMemo(
-      () => [
-        theme === "dark" ? darkTheme : lightTheme,
-        syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
-        ...readonlyCodeExtensions(language),
-      ],
-      [theme, language],
-    );
 
     return (
       <div
@@ -104,16 +72,16 @@ export const ReadonlyCode = memo(
             />
           )}
         </div>
-        <CodeMirror
-          {...rest}
-          className={cn("cm", hideCode && "opacity-20 h-8 overflow-hidden")}
-          theme="none"
-          height="100%"
-          editable={false}
-          extensions={extensions}
-          value={code}
-          readOnly={true}
-        />
+        {!hideCode && (
+          <SyntaxHighlighter
+            language={language}
+            style={
+              theme === "light" ? lightSyntaxHighlight : darkSyntaxHighlight
+            }
+          >
+            {code}
+          </SyntaxHighlighter>
+        )}
       </div>
     );
   },
