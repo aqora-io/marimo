@@ -104,7 +104,10 @@ async function createApp({
 
   /// Notebook rendering
   app.on(["HEAD", "GET"], "/:filename", async (c) => {
-    if (accessToken !== undefined && c.req.query("token") !== accessToken) {
+    if (
+      accessToken !== undefined &&
+      c.req.query("access_token") !== accessToken
+    ) {
       return c.notFound();
     }
 
