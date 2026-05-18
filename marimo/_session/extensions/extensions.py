@@ -10,8 +10,10 @@ from __future__ import annotations
 import asyncio
 import copy
 import html
+import json
 from enum import Enum
 from functools import partial
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import msgspec
@@ -23,10 +25,14 @@ from marimo._messaging.notebook.document import NotebookCell
 from marimo._messaging.notification import (
     AlertNotification,
     BannerNotification,
+    CompletedRunNotification,
     NotebookDocumentTransactionNotification,
     NotificationMessage,
 )
-from marimo._messaging.serde import try_deserialize_kernel_notification_name
+from marimo._messaging.serde import (
+    deserialize_kernel_message,
+    try_deserialize_kernel_notification_name,
+)
 from marimo._messaging.types import KernelMessage
 from marimo._runtime import commands
 from marimo._session.extensions.types import (
@@ -37,6 +43,11 @@ from marimo._session.model import SessionMode
 from marimo._session.state.serialize import (
     SessionCacheKey,
     SessionCacheManager,
+    _script_metadata_hash,
+    get_notebook_cache_file,
+    get_session_cache_file,
+    serialize_session_view,
+    serialize_notebook,
 )
 from marimo._session.types import (
     KernelManager,
@@ -226,9 +237,9 @@ class CachingExtension(EventAwareExtension):
             key
         )
 
-        # Start the background task to write the session view to disk
-        if self.mode is CacheMode.READ_WRITE:
-            self.session_cache_manager.start()
+        # # Start the background task to write the session view to disk
+        # if self.mode is CacheMode.READ_WRITE:
+        #     self.session_cache_manager.start()
 
     def on_detach(self) -> None:
         """Stop cache manager when detached."""
@@ -252,6 +263,45 @@ class CachingExtension(EventAwareExtension):
         if self.session_cache_manager:
             self.session_cache_manager.stop()
             self.session_cache_manager = None
+
+    def on_notification_sent(
+        self, session: Session, notification: KernelMessage
+    ) -> None:
+        notification_data = deserialize_kernel_message(notification)
+        if not isinstance(notification_data, CompletedRunNotification):
+            return
+
+        if not session.session_view.needs_export("session"):
+            return
+
+        notebook_path = session.app_file_manager.path
+        if notebook_path is None:
+            return
+
+        notebook_path = Path(notebook_path)
+
+        session_cache = get_session_cache_file(notebook_path)
+        LOGGER.debug(f"Writing {session_cache=}...")
+
+        session_snapshot = serialize_session_view(
+            session.session_view,
+            cell_ids=session.document.cell_ids,
+            script_metadata_hash=_script_metadata_hash(notebook_path),
+            drop_virtual_file_outputs=True,
+        )
+        session_cache.parent.mkdir(parents=True, exist_ok=True)
+        session_cache.write_text(json.dumps(session_snapshot, indent=2))
+
+        notebook_cache = get_notebook_cache_file(notebook_path)
+        LOGGER.debug(f"Writing {notebook_cache=}...")
+
+        notebook_snapshot = serialize_notebook(
+            session.session_view, session.app_file_manager.app.cell_manager
+        )
+        notebook_cache.parent.mkdir(parents=True, exist_ok=True)
+        notebook_cache.write_text(json.dumps(notebook_snapshot, indent=2))
+
+        session.session_view.mark_auto_export_session()
 
 
 class NotificationListenerExtension(SessionExtension):
