@@ -51,7 +51,7 @@ import {
   ValidateSQL,
 } from "../datasets/request-registry";
 import { useDatasetsActions } from "../datasets/state";
-import { UI_ELEMENT_REGISTRY } from "../dom/uiregistry";
+import { UIElementRegistry } from "../dom/uiregistry";
 import { kernelStartupErrorAtom, useBannersActions } from "../errors/state";
 import { FUNCTIONS_REGISTRY } from "../functions/FunctionRegistry";
 import {
@@ -307,7 +307,7 @@ export function useMarimoKernelConnection(opts: {
         const uiElement = msg.data.ui_element;
         if (uiElement) {
           const buffers = safeExtractSetUIElementMessageBuffers(msg.data);
-          UI_ELEMENT_REGISTRY.broadcastMessage(
+          UIElementRegistry.INSTANCE.broadcastMessage(
             uiElement,
             msg.data.message,
             buffers,

@@ -65,6 +65,18 @@ function testDownloadCapability(): boolean {
  * This should be called once at startup and cached
  */
 function detectIframeCapabilities(): IframeCapabilities {
+  if (import.meta.env.SSR) {
+    return {
+      isEmbedded: false,
+      hasLocalStorage: false,
+      hasSessionStorage: false,
+      hasClipboard: false,
+      hasDownloads: false,
+      hasFullscreen: false,
+      hasMediaDevices: false,
+    };
+  }
+
   const isEmbedded = window.parent !== window;
 
   const capabilities: IframeCapabilities = {

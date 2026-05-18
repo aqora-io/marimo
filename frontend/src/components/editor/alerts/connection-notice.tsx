@@ -44,6 +44,7 @@ export const ConnectionNotice = ({
       notice?.ready && notice.kind === "startup" ? "Ready" : notice?.title;
     return (
       <VerticalLayoutWrapper
+        mode="edit"
         appConfig={appConfig}
         // Reserve the status row and gutter so completion never shifts cells.
         className="shrink-0 h-12 pb-0 sm:pb-0 print:hidden"
@@ -80,6 +81,7 @@ export const ConnectionNotice = ({
       notice.phase === "starting-kernel");
   return (
     <VerticalLayoutWrapper
+      mode="edit"
       appConfig={appConfig}
       className="shrink-0 pb-0 sm:pb-0 print:hidden"
       innerClassName="pb-0 sm:pb-0 pr-4"

@@ -59,7 +59,6 @@ import { ErrorBoundary } from "@/components/editor/boundary/ErrorBoundary";
 import { ContextAwarePanelItem } from "@/components/editor/chrome/panels/context-aware-panel/context-aware-panel";
 import { Alert, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { DelayMount } from "@/components/utils/delay-mount";
 import { type CellId, findCellId, UIElementId } from "@/core/cells/ids";
 import {
   OBJECT_ID_ATTR,
@@ -70,7 +69,7 @@ import { store } from "@/core/state/jotai";
 import { isStaticNotebook } from "@/core/static/static-state";
 import { isIslands } from "@/core/islands/utils";
 import { isInVscodeExtension } from "@/core/vscode/is-in-vscode";
-import { useAsyncData } from "@/hooks/useAsyncData";
+import { Nothing, useAsyncData } from "@/hooks/useAsyncData";
 import { useDeepCompareMemoize } from "@/hooks/useDeepCompareMemoize";
 import { useEffectSkipFirstRender } from "@/hooks/useEffectSkipFirstRender";
 import { Arrays } from "@/utils/arrays";
@@ -91,6 +90,7 @@ import {
   type FilterGroupType,
   columnToFieldTypesSchema,
 } from "./data-frames/schema";
+import { jsonParseWithSpecialChar } from "@/utils/json/json-parser";
 
 type CsvURL = string;
 export type TableData<T> = T[] | CsvURL;
@@ -549,92 +549,128 @@ export const LoadingDataTableComponent = memo(
       totalRows: number | TooManyRows;
       cellStyles: CellStyleState | undefined | null;
       cellHoverTexts?: Record<string, Record<string, string | null>> | null;
-    }>(async () => {
-      // If there is no data, return an empty array
-      if (props.totalRows === 0) {
-        return {
-          rows: Arrays.EMPTY,
-          totalRows: 0,
-          cellStyles: {},
-        };
-      }
+    }>(
+      {
+        async fetch() {
+          // If there is no data, return an empty array
+          if (props.totalRows === 0) {
+            return {
+              rows: Arrays.EMPTY,
+              totalRows: 0,
+              cellStyles: {},
+            };
+          }
 
-      // Table data is a url string or an array of objects
-      let tableData = props.data;
-      let rawTableData: TableData<T> | undefined | null = props.rawData;
-      let totalRows = props.totalRows;
-      let cellStyles = props.cellStyles;
-      let cellHoverTexts = props.cellHoverTexts;
+          // Table data is a url string or an array of objects
+          let tableData = props.data;
+          let rawTableData: TableData<T> | undefined | null = props.rawData;
+          let totalRows = props.totalRows;
+          let cellStyles = props.cellStyles;
+          let cellHoverTexts = props.cellHoverTexts;
 
-      const pageSizeChanged = paginationState.pageSize !== props.pageSize;
+          const pageSizeChanged = paginationState.pageSize !== props.pageSize;
 
-      // If it is just the first page and no search query,
-      // we can show the initial page.
-      const canShowInitialPage =
-        searchQuery === "" &&
-        paginationState.pageIndex === 0 &&
-        filters.length === 0 &&
-        sorting.length === 0 &&
-        !props.lazy &&
-        !pageSizeChanged;
+          // If it is just the first page and no search query,
+          // we can show the initial page.
+          const canShowInitialPage =
+            searchQuery === "" &&
+            paginationState.pageIndex === 0 &&
+            filters.length === 0 &&
+            sorting.length === 0 &&
+            !props.lazy &&
+            !pageSizeChanged;
 
-      // Convert sorting state to API format
-      const sortArgs =
-        sorting.length > 0
-          ? sorting.map((s) => ({ by: s.id, descending: s.desc }))
-          : undefined;
+          // Convert sorting state to API format
+          const sortArgs =
+            sorting.length > 0
+              ? sorting.map((s) => ({ by: s.id, descending: s.desc }))
+              : undefined;
 
-      // If we have sort/search/filter, use the search function
-      const searchResultsPromise = search<T>({
-        sort: sortArgs,
-        query: searchQuery,
-        page_number: paginationState.pageIndex,
-        page_size: paginationState.pageSize,
-        filters: filtersToFilterGroup(filters),
-      });
+          // If we have sort/search/filter, use the search function
+          const searchResultsPromise = search<T>({
+            sort: sortArgs,
+            query: searchQuery,
+            page_number: paginationState.pageIndex,
+            page_size: paginationState.pageSize,
+            filters: filtersToFilterGroup(filters),
+          });
 
-      if (canShowInitialPage) {
-        // We still want to run the search,
-        // so the backend knows the current state for selection
-        // see https://github.com/marimo-team/marimo/issues/2756
-        // But we should catch errors; this may happen for static exports.
-        void searchResultsPromise.catch((error) => {
-          Logger.error(error);
-        });
-      } else {
-        const searchResults = await searchResultsPromise;
-        tableData = searchResults.data;
-        rawTableData = searchResults.raw_data;
-        totalRows = searchResults.total_rows;
-        cellStyles = searchResults.cell_styles || {};
-        cellHoverTexts = searchResults.cell_hover_texts || {};
-      }
-      const [data, rawData] = await loadTableAndRawData(
-        tableData,
-        rawTableData,
-      );
-      tableData = data;
-      return {
-        rows: tableData,
-        rawRows: rawData,
-        totalRows: totalRows,
-        cellStyles,
-        cellHoverTexts,
-      };
-    }, [
-      sorting,
-      search,
-      filters,
-      searchQuery,
-      useDeepCompareMemoize(props.fieldTypes),
-      props.data,
-      props.totalRows,
-      props.lazy,
-      props.cellHoverTexts,
-      props.cellStyles,
-      paginationState.pageSize,
-      paginationState.pageIndex,
-    ]);
+          if (canShowInitialPage) {
+            // We still want to run the search,
+            // so the backend knows the current state for selection
+            // see https://github.com/marimo-team/marimo/issues/2756
+            // But we should catch errors; this may happen for static exports.
+            void searchResultsPromise.catch((error) => {
+              Logger.error(error);
+            });
+          } else {
+            const searchResults = await searchResultsPromise;
+            tableData = searchResults.data;
+            rawTableData = searchResults.raw_data;
+            totalRows = searchResults.total_rows;
+            cellStyles = searchResults.cell_styles || {};
+            cellHoverTexts = searchResults.cell_hover_texts || {};
+          }
+          const [data, rawData] = await loadTableAndRawData(
+            tableData,
+            rawTableData,
+          );
+          tableData = data;
+          return {
+            rows: tableData,
+            rawRows: rawData,
+            totalRows: totalRows,
+            cellStyles,
+            cellHoverTexts,
+          };
+        },
+        optimisticFetch() {
+          let rows: T[];
+          if (Array.isArray(props.data)) {
+            rows = props.data;
+          } else if (
+            typeof props.data === "string" &&
+            (props.data.startsWith("{") || props.data.startsWith("["))
+          ) {
+            rows = jsonParseWithSpecialChar(props.data);
+          } else {
+            return Nothing;
+          }
+
+          let rawRows: T[] | undefined;
+          if (Array.isArray(props.rawData)) {
+            rawRows = props.rawData;
+          } else if (
+            typeof props.rawData === "string" &&
+            (props.rawData.startsWith("{") || props.rawData.startsWith("["))
+          ) {
+            rawRows = jsonParseWithSpecialChar(props.rawData);
+          }
+
+          return {
+            rows,
+            rawRows,
+            totalRows: props.totalRows,
+            cellStyles: props.cellStyles,
+            cellHoverTexts: props.cellHoverTexts,
+          };
+        },
+      },
+      [
+        sorting,
+        search,
+        filters,
+        searchQuery,
+        useDeepCompareMemoize(props.fieldTypes),
+        props.data,
+        props.totalRows,
+        props.lazy,
+        props.cellHoverTexts,
+        props.cellStyles,
+        paginationState.pageSize,
+        paginationState.pageIndex,
+      ],
+    );
 
     const policy = useAtomValue(downloadSizeLimitAtom);
     const { data: sizeBytesData, isPending: sizeBytesPending } = useAsyncData<
@@ -730,15 +766,13 @@ export const LoadingDataTableComponent = memo(
 
     if (isPending) {
       return (
-        <DelayMount milliseconds={200}>
-          <LoadingTable
-            pageSize={
-              props.totalRows !== TOO_MANY_ROWS && props.totalRows > 0
-                ? Math.min(props.totalRows, props.pageSize)
-                : props.pageSize
-            }
-          />
-        </DelayMount>
+        <LoadingTable
+          pageSize={
+            props.totalRows !== TOO_MANY_ROWS && props.totalRows > 0
+              ? Math.min(props.totalRows, props.pageSize)
+              : props.pageSize
+          }
+        />
       );
     }
 
