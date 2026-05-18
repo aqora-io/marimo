@@ -1,0 +1,69 @@
+import { readFile } from "node:fs/promises";
+
+import { type ConfigEnv, type UserConfig } from "vite";
+import react from "@vitejs/plugin-react";
+
+export default async ({ mode }: ConfigEnv): Promise<UserConfig> => {
+  process.env.NODE_ENV = mode;
+
+  const pkg = JSON.parse(
+    (await readFile("./package.json")).toString("utf8"),
+  ) as PackageJson;
+  const external = Object.keys(pkg.dependencies).concat(
+    Object.keys(pkg.peerDependencies ?? {}),
+  );
+
+  return {
+    build: {
+      sourcemap: mode === "development",
+      minify: mode !== "development" && "oxc",
+      ssr: true,
+      ssrEmitAssets: true,
+      cssCodeSplit: mode === "development",
+      manifest: true,
+      rollupOptions: {
+        input: {
+          index: "src/index.tsx",
+          main: "src/cli/main.ts",
+        },
+        output: {
+          entryFileNames: `[name].${mode}.js`,
+        },
+      },
+    },
+    define: {
+      "process.env.NODE_ENV": JSON.stringify(mode),
+    },
+    experimental: {
+      enableNativePlugin: true,
+    },
+    resolve: {
+      tsconfigPaths: true,
+    },
+    ssr: {
+      target: "node",
+      external,
+      noExternal: true,
+    },
+    plugins: [
+      react({
+        babel: {
+          presets: ["@babel/preset-typescript"],
+          plugins: [
+            ["@babel/plugin-proposal-decorators", { legacy: true }],
+            ["babel-plugin-react-compiler", ReactCompilerConfig],
+          ],
+        },
+      }),
+    ],
+  };
+};
+
+interface PackageJson {
+  dependencies: Record<string, unknown>;
+  peerDependencies?: Record<string, unknown> | undefined;
+}
+
+const ReactCompilerConfig = {
+  target: "19",
+};
