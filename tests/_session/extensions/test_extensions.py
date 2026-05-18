@@ -123,7 +123,11 @@ class TestCachingExtension:
 
     @patch("marimo._session.extensions.extensions.SessionCacheManager")
     def test_lifecycle(self, mock_cache_cls, mock_session, event_bus) -> None:
-        """Test cache manager creation, start, and stop."""
+        """Test cache manager creation and stop.
+
+        Its background writer never starts: the session is exported after
+        each completed run instead.
+        """
         mock_cache = Mock()
         mock_cache_cls.return_value = mock_cache
         mock_cache.read_session_view = Mock(
@@ -133,7 +137,7 @@ class TestCachingExtension:
         extension = CachingExtension(enabled=True)
         extension.on_attach(mock_session, event_bus)
 
-        mock_cache.start.assert_called_once()
+        mock_cache.start.assert_not_called()
 
         extension.on_detach()
 
