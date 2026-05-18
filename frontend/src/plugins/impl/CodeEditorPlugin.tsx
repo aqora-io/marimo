@@ -9,6 +9,7 @@ import { type Theme, useTheme } from "@/theme/useTheme";
 import type { IPlugin, IPluginProps, Setter } from "../types";
 import { LazyAnyLanguageCodeMirror } from "./code/LazyAnyLanguageCodeMirror";
 import { Labeled } from "./common/labeled";
+import { isLanguageSupported, ReadonlyCode } from "@/components/editor/code/readonly-python-code";
 
 type T = string;
 
@@ -41,6 +42,12 @@ export class CodeEditorPlugin implements IPlugin<T, Data> {
   });
 
   render(props: IPluginProps<T, Data>): JSX.Element {
+    if (import.meta.env.SSR) {
+      if (isLanguageSupported(props.data.language)) {
+        return <ReadonlyCode code={props.value} language={props.data.language} />
+      }
+      return <code className="whitespace-pre-wrap">{props.value}</code>
+    }
     return (
       <CodeEditorComponent
         {...props.data}

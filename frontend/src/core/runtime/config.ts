@@ -18,7 +18,7 @@ function getBaseURI(): string {
 
 export const DEFAULT_RUNTIME_CONFIG: RuntimeConfig = {
   lazy: true,
-  url: getBaseURI(),
+  url: import.meta.env.SSR ? "https://marimo.io" : getBaseURI(),
 };
 
 export const runtimeConfigAtom = atom<RuntimeConfig>(DEFAULT_RUNTIME_CONFIG);

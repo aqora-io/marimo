@@ -8,6 +8,8 @@ import { clamp } from "@/utils/math";
 const DELAY_PER_CELL = 30; // ms
 
 export function useDelayVisibility(numCells: number, mode: AppMode) {
+  if (import.meta.env.SSR) return { invisible: false };
+
   // Start the app as invisible and delay proportional to the number of cells,
   // to avoid most of the flickering when the app is loaded (b/c it is
   // streamed).

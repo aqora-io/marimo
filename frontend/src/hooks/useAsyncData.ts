@@ -230,9 +230,13 @@ interface Context {
   previous(): void;
 }
 
+export const Nothing = Symbol("Nothing");
+export type Nothing = typeof Nothing;
+
 type Props<T> =
   | {
       fetch: (context: Context) => Promise<T>;
+      optimisticFetch?: () => T | Nothing;
     }
   | ((context: Context) => Promise<T>);
 
@@ -320,14 +324,26 @@ export function useAsyncData<T>(
   refetch: () => void;
 } {
   const [nonce, setNonce] = useState(0);
-  const [result, setResult] = useState<
-    PendingResult<T> | LoadingResult<T> | ErrorResult<T> | SuccessResult<T>
-  >(Result.pending());
 
   const asProps =
     typeof loaderOrProps === "function"
       ? { fetch: loaderOrProps }
       : loaderOrProps;
+
+  const [result, setResult] = useState<
+    PendingResult<T> | LoadingResult<T> | ErrorResult<T> | SuccessResult<T>
+  >(() => {
+    if (!import.meta.env.SSR || !asProps.optimisticFetch) {
+      return Result.pending();
+    }
+
+    const value = asProps.optimisticFetch();
+    if (value === Nothing) {
+      return Result.pending();
+    }
+
+    return Result.success(value);
+  });
 
   const fetchStable = useEvent(asProps.fetch);
 

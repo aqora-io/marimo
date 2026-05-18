@@ -43,6 +43,7 @@ function isMarimoStaticState(
 }
 
 function getMarimoStaticState(): Readonly<MarimoStaticState> | undefined {
+  if (import.meta.env.SSR) return { files: {} };
   // `typeof window` guard handles the identifier-undeclared case (e.g.
   // leaked async work firing after jsdom teardown in tests); `?.` only
   // short-circuits on null/undefined.
