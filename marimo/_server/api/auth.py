@@ -206,6 +206,7 @@ class CustomSessionMiddleware(SessionMiddleware):
         same_site: typing.Literal["lax", "strict", "none"] = "lax",
         https_only: bool = False,
         domain: str | None = None,
+        partitioned: bool = False,
     ) -> None:
         from packaging import version
 
@@ -237,6 +238,9 @@ class CustomSessionMiddleware(SessionMiddleware):
                 same_site,
                 https_only,
             )
+
+        if partitioned:
+            self.security_flags += "; partitioned"
 
     async def __call__(
         self, scope: Scope, receive: Receive, send: Send
