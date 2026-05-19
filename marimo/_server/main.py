@@ -73,6 +73,7 @@ def create_starlette_app(
                     CustomSessionMiddleware,
                     secret_key=RANDOM_SECRET,
                     https_only=GLOBAL_SETTINGS.SESSION_COOKIE_SECURE,
+                    same_site="none",
                 ),
             ]
         )
