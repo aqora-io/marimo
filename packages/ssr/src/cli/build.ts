@@ -93,6 +93,8 @@ export function writeHtml(
       return writeHtmlDsd(html, bundle, assetsBase);
     case "dsd-page":
       return writeHtmlDsdPage(html, bundle, assetsBase);
+    case "json":
+      return writeHtmlJson(html, bundle, assetsBase);
   }
 }
 
@@ -165,6 +167,34 @@ function writeHtmlDsdPage(
     </div>
   </body>
 </html>`;
+}
+
+function writeHtmlJson(
+  html: string,
+  bundle: ViteManifest,
+  assetsBase: string | undefined,
+): string {
+  const assets = Array.from(iterManifestAssets(bundle));
+  const fonts = assets
+    .filter(([asset, extension]) => isAssetFont(asset, extension))
+    .map(([asset]) => joinUrl(assetsBase, asset.file));
+  const styles = assets
+    .filter(
+      ([asset, extension]) =>
+        extension === ".css" && !isAssetFont(asset, extension),
+    )
+    .map(([asset]) => joinUrl(assetsBase, asset.file));
+  const images = assets
+    .filter(
+      ([_asset, extension]) => extension === ".png" || extension === ".svg",
+    )
+    .map(([asset]) => joinUrl(assetsBase, asset.file));
+  return JSON.stringify({
+    html: `<div id="root" class="marimo light" style="min-height:auto;position:relative;--tw-border-style:solid">${html}</div>`,
+    fonts,
+    styles,
+    images,
+  });
 }
 
 function writeHtmlLinks(

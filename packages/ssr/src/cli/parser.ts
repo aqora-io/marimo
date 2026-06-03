@@ -21,6 +21,7 @@ export const OutputType = Object.freeze([
   "page",
   "dsd",
   "dsd-page",
+  "json",
 ] as const);
 export type OutputType = (typeof OutputType)[number];
 
