@@ -156,40 +156,64 @@
   --shadow-xxs: 0px 0px 2px 0px var(--base-shadow-darker);
 
   /* oxfmt-ignore: definition needs to be oneline or breaks variants */
-  --shadow-xs: 1px 1px 2px 0px var(--base-shadow), 0px 0px 2px 0px hsl(0deg 0% 25% / var(--base-shadow-opacity));
+  --shadow-xs:
+    1px 1px 2px 0px var(--base-shadow),
+    0px 0px 2px 0px hsl(0deg 0% 25% / var(--base-shadow-opacity));
 
   /* oxfmt-ignore: definition needs to be oneline or breaks variants */
-  --shadow-sm: 2px 2px 2px 0px var(--base-shadow), 0px 0px 2px 0px hsl(0deg 0% 25% / var(--base-shadow-opacity));
+  --shadow-sm:
+    2px 2px 2px 0px var(--base-shadow),
+    0px 0px 2px 0px hsl(0deg 0% 25% / var(--base-shadow-opacity));
 
   /* oxfmt-ignore: definition needs to be oneline or breaks variants */
-  --shadow-md: 4px 4px 4px 0px var(--base-shadow), 0 0px 4px 0px hsl(0deg 0% 60% / var(--base-shadow-opacity));
+  --shadow-md:
+    4px 4px 4px 0px var(--base-shadow),
+    0 0px 4px 0px hsl(0deg 0% 60% / var(--base-shadow-opacity));
 
   /* oxfmt-ignore: definition needs to be oneline or breaks variants */
-  --shadow-lg: 5px 6px 4px 0px var(--base-shadow), 0 0px 4px 0px hsl(0deg 0% 75% / var(--base-shadow-opacity));
+  --shadow-lg:
+    5px 6px 4px 0px var(--base-shadow),
+    0 0px 4px 0px hsl(0deg 0% 75% / var(--base-shadow-opacity));
 
   /* oxfmt-ignore: definition needs to be oneline or breaks variants */
-  --shadow-xl: 8px 9px 4px 0px var(--base-shadow), 0 0px 6px 0px hsl(0deg 0% 85% / var(--base-shadow-opacity));
+  --shadow-xl:
+    8px 9px 4px 0px var(--base-shadow),
+    0 0px 6px 0px hsl(0deg 0% 85% / var(--base-shadow-opacity));
 
   /* oxfmt-ignore: definition needs to be oneline or breaks variants */
-  --shadow-2xl: 10px 12px 10px 0px var(--base-shadow), 0 0px 8px 0px hsl(0deg 0% 90% / var(--base-shadow-opacity));
+  --shadow-2xl:
+    10px 12px 10px 0px var(--base-shadow),
+    0 0px 8px 0px hsl(0deg 0% 90% / var(--base-shadow-opacity));
 
   /* oxfmt-ignore: definition needs to be oneline or breaks variants */
-  --shadow-xs-solid: 1px 1px 0px 0px var(--base-shadow-darker), 0px 0px 2px 0px hsl(0deg 0% 50% / 20%);
+  --shadow-xs-solid:
+    1px 1px 0px 0px var(--base-shadow-darker),
+    0px 0px 2px 0px hsl(0deg 0% 50% / 20%);
 
   /* oxfmt-ignore: definition needs to be oneline or breaks variants */
-  --shadow-sm-solid: 2px 2px 0px 0px var(--base-shadow-darker), 0px 0px 2px 0px hsl(0deg 0% 50% / 20%);
+  --shadow-sm-solid:
+    2px 2px 0px 0px var(--base-shadow-darker),
+    0px 0px 2px 0px hsl(0deg 0% 50% / 20%);
 
   /* oxfmt-ignore: definition needs to be oneline or breaks variants */
-  --shadow-md-solid: 4px 4px 0px 0px var(--base-shadow-darker), 0 0px 2px 0px hsl(0deg 0% 60% / 50%);
+  --shadow-md-solid:
+    4px 4px 0px 0px var(--base-shadow-darker),
+    0 0px 2px 0px hsl(0deg 0% 60% / 50%);
 
   /* oxfmt-ignore: definition needs to be oneline or breaks variants */
-  --shadow-lg-solid: 5px 6px 0px 0px var(--base-shadow-darker), 0 0px 4px 0px hsl(0deg 0% 75% / 50%);
+  --shadow-lg-solid:
+    5px 6px 0px 0px var(--base-shadow-darker),
+    0 0px 4px 0px hsl(0deg 0% 75% / 50%);
 
   /* oxfmt-ignore: definition needs to be oneline or breaks variants */
-  --shadow-xl-solid: 7px 8px 0px 0px var(--base-shadow-darker), 0 0px 4px 0px hsl(0deg 0% 85% / 50%);
+  --shadow-xl-solid:
+    7px 8px 0px 0px var(--base-shadow-darker),
+    0 0px 4px 0px hsl(0deg 0% 85% / 50%);
 
   /* oxfmt-ignore: definition needs to be oneline or breaks variants */
-  --shadow-2xl-solid: 10px 12px 0px 0px var(--base-shadow-darker), 0 0px 8px 0px hsl(0deg 0% 90% / 50%);
+  --shadow-2xl-solid:
+    10px 12px 0px 0px var(--base-shadow-darker),
+    0 0px 8px 0px hsl(0deg 0% 90% / 50%);
 
   /* Solid shadows with lighter shade color */
 
@@ -200,4 +224,59 @@
   /* oxfmt-ignore: definition needs to be oneline or breaks variants */
   --shadow-md-solid-shade:
     4px 4px 0px 0px var(--base-shadow), 0 0px 2px 0px hsl(0deg 0% 60% / 50%);
+}
+
+@layer base {
+  :root {
+    --unit: 14.4px;
+  }
+}
+
+@theme inline {
+  --spacing: calc(0.25 * var(--unit));
+  --spacing-td: calc(0.18 * var(--unit));
+  /* --breakpoint-sm: calc(40 * var(--unit)); */
+  /* --breakpoint-md: calc(48 * var(--unit)); */
+  /* --breakpoint-lg: calc(64 * var(--unit)); */
+  /* --breakpoint-xl: calc(80 * var(--unit)); */
+  /* --breakpoint-2xl: calc(96 * var(--unit)); */
+  --breakpoint-sm: 576px;
+  --breakpoint-md: 691.2px;
+  --breakpoint-lg: 921.6px;
+  --breakpoint-xl: 1152px;
+  --breakpoint-2xl: 1382.4px;
+  --container-3xs: calc(16 * var(--unit));
+  --container-2xs: calc(18 * var(--unit));
+  --container-xs: calc(20 * var(--unit));
+  --container-sm: calc(24 * var(--unit));
+  --container-md: calc(28 * var(--unit));
+  --container-lg: calc(32 * var(--unit));
+  --container-xl: calc(36 * var(--unit));
+  --container-2xl: calc(42 * var(--unit));
+  --container-3xl: calc(48 * var(--unit));
+  --container-4xl: calc(56 * var(--unit));
+  --container-5xl: calc(64 * var(--unit));
+  --container-6xl: calc(72 * var(--unit));
+  --container-7xl: calc(80 * var(--unit));
+  --text-xs: calc(0.75 * var(--unit));
+  --text-sm: calc(0.875 * var(--unit));
+  --text-base: calc(1 * var(--unit));
+  --text-lg: calc(1.125 * var(--unit));
+  --text-xl: calc(1.25 * var(--unit));
+  --text-2xl: calc(1.5 * var(--unit));
+  --text-3xl: calc(1.875 * var(--unit));
+  --text-4xl: calc(2.25 * var(--unit));
+  --text-5xl: calc(3 * var(--unit));
+  --text-6xl: calc(3.75 * var(--unit));
+  --text-7xl: calc(4.5 * var(--unit));
+  --text-8xl: calc(6 * var(--unit));
+  --text-9xl: calc(8 * var(--unit));
+  --radius-xs: calc(0.125 * var(--unit));
+  --radius-sm: calc(0.25 * var(--unit));
+  --radius-md: calc(0.375 * var(--unit));
+  --radius-lg: calc(0.5 * var(--unit));
+  --radius-xl: calc(0.75 * var(--unit));
+  --radius-2xl: calc(1 * var(--unit));
+  --radius-3xl: calc(1.5 * var(--unit));
+  --radius-4xl: calc(2 * var(--unit));
 }

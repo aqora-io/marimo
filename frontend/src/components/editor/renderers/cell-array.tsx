@@ -133,6 +133,7 @@ const CellArrayInternal: React.FC<CellArrayProps> = ({
       // 'pb' allows the user to put the cell in the middle of the screen
       className={cn(!isPresenting && "pb-[40vh]")}
       invisible={false}
+      mode={mode}
       appConfig={appConfig}
       // 'pr' makes room for the floating actions
       innerClassName={cn(!isPresenting && "pr-4")}

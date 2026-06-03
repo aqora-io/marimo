@@ -19,12 +19,12 @@ export default async ({ mode }: ConfigEnv): Promise<UserConfig> => {
       minify: mode !== "development" && "oxc",
       ssr: true,
       ssrEmitAssets: true,
-      cssCodeSplit: mode === "development",
       manifest: true,
       rollupOptions: {
         input: {
           index: "src/index.tsx",
           main: "src/cli/main.ts",
+          fonts: "../../frontend/src/css/app/fonts.css",
         },
         output: {
           entryFileNames: `[name].${mode}.js`,

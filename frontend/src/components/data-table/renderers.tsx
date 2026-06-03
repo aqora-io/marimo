@@ -159,7 +159,7 @@ export const DataTableBody = <TData,>({
             cell.column.getColumnWrapping &&
               cell.column.getColumnWrapping?.() === "wrap" &&
               COLUMN_WRAPPING_STYLES,
-            "px-1.5 py-[0.18rem]",
+            "px-1.5 py-td",
             className,
           )}
           style={style}

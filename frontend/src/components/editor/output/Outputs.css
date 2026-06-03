@@ -12,8 +12,8 @@
 /* No margin in edit mode, where we already have separation
  * between cells. */
 .marimo-cell.published .output-area .output {
-  margin-top: 1rem;
-  margin-bottom: 1rem;
+  margin-top: var(--unit);
+  margin-bottom: var(--unit);
 }
 
 .marimo-error a {

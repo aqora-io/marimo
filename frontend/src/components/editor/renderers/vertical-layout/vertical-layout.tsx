@@ -161,7 +161,11 @@ export const VerticalLayoutRenderer: React.FC<VerticalLayoutProps> = ({
   // spacing between cells to prevent them from colliding; in edit mode,
   // spacing is handled elsewhere
   return (
-    <VerticalLayoutWrapper invisible={invisible} appConfig={appConfig}>
+    <VerticalLayoutWrapper
+      mode={mode}
+      invisible={invisible}
+      appConfig={appConfig}
+    >
       <div className={cn("flex flex-col", showCode && canShowCode && "gap-5")}>
         {renderCells()}
       </div>

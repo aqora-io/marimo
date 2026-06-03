@@ -3,6 +3,8 @@
 const plugin = require("tailwindcss/plugin");
 const { fontFamily } = require("tailwindcss/defaultTheme");
 
+const { prose } = require("./prose.mjs");
+
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   darkMode: ["class"],
@@ -143,30 +145,34 @@ module.exports = {
         "3-fit": "repeat(3, minmax(0, max-content))",
       },
       typography: {
+        ...prose,
         DEFAULT: {
-          css: {
-            fontFamily: "var(--text-font)",
-            color: "inherit",
-            pre: {
+          css: [
+            {
+              fontFamily: "var(--text-font)",
               color: "inherit",
-              background: "inherit",
+              pre: {
+                color: "inherit",
+                background: "inherit",
+              },
+              "code::before": {
+                content: "",
+              },
+              "code::after": {
+                content: "",
+              },
+              code: {
+                fontWeight: 500,
+              },
+              "ul > li::marker": {
+                color: "var(--muted-foreground)",
+              },
+              "ol > li::marker": {
+                color: "var(--muted-foreground)",
+              },
             },
-            "code::before": {
-              content: "",
-            },
-            "code::after": {
-              content: "",
-            },
-            code: {
-              fontWeight: 500,
-            },
-            "ul > li::marker": {
-              color: "var(--muted-foreground)",
-            },
-            "ol > li::marker": {
-              color: "var(--muted-foreground)",
-            },
-          },
+            ...prose.base.css,
+          ],
         },
         slides: {
           // This aims to match Google Slides' typography
