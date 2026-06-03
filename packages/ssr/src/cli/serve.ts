@@ -185,9 +185,16 @@ async function createApp({
       return c.text("Internal Server Error", 500);
     }
 
+    const body = writeHtml(html, outputType, manifest, assetsBase);
+
     c.header("ETag", etag);
     c.header("Date", session.mtime.toUTCString());
-    return c.html(writeHtml(html, outputType, manifest, assetsBase), 200);
+    if (outputType === "json") {
+      c.header("Content-Type", "application/json");
+    } else {
+      c.header("Content-Type", "text/html");
+    }
+    return c.body(body, 200);
   });
 
   return app;
