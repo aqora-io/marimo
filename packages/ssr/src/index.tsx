@@ -25,7 +25,9 @@ import type { NotebookSnapshot } from "./types";
 import { createStore, defaultAppConfig, defaultUserConfig } from "./store";
 
 import "@marimo-team/frontend/unstable_internal/css/index.css";
-import "@marimo-team/frontend/unstable_internal/css/app/App.css";
+import "@marimo-team/frontend/unstable_internal/css/app/reset.css";
+import "@marimo-team/frontend/unstable_internal/css/app/Cell.css";
+// import "@marimo-team/frontend/unstable_internal/css/app/App.css";
 
 export interface RenderNotebookProps extends RenderToReadableStreamOptions {
   appConfig?: AppConfig | undefined;
@@ -58,6 +60,7 @@ export async function renderNotebook(
             <LocaleProvider>
               <ModalProvider>
                 <SlotzProvider controller={slotsController}>
+                  <div className="pt-8" />
                   <NotebookCells />
                 </SlotzProvider>
               </ModalProvider>
