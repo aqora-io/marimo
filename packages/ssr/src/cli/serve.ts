@@ -20,9 +20,9 @@ import type { NotebookSnapshot } from "../types";
 import { readViteManifest, writeHtml } from "./build";
 import { Readable } from "node:stream";
 
-export async function serve(options: ServeCommand) {
+export async function serve(version: string, options: ServeCommand) {
   print(message`Initializing server...`);
-  const app = await createApp(options);
+  const app = await createApp(version, options);
 
   const serverOptions = {
     fetch: app.fetch,
@@ -66,13 +66,10 @@ function closeServer(server: HonoServer): Promise<void> {
   });
 }
 
-async function createApp({
-  basePath = "",
-  origin,
-  directory,
-  timeout,
-  accessToken,
-}: ServeCommand): Promise<Hono> {
+async function createApp(
+  version: string,
+  { basePath = "", origin, directory, timeout, accessToken }: ServeCommand,
+): Promise<Hono> {
   directory = path.resolve(directory);
   const manifest = await readViteManifest();
   const assetDir = path.join(
@@ -155,7 +152,8 @@ async function createApp({
       return c.text("Notebook was not properly exported", 500);
     }
 
-    const etag = await hashFile(sessionPath);
+    const sessionHash = await hashFile(sessionPath);
+    const etag = `${version}/${sessionHash}`;
 
     if (c.req.method === "HEAD") {
       c.header("ETag", etag);

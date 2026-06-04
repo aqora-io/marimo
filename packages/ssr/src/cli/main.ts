@@ -28,6 +28,6 @@ async function main() {
       return await build(options);
 
     case "serve":
-      return await serve(options);
+      return await serve(__VERSION__ || "dev", options);
   }
 }
