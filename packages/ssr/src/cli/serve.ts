@@ -282,8 +282,13 @@ function getAssetsBase(
   origin: string | undefined,
   basePath: string,
 ): string {
-  if (outputType !== "dsd") return ".";
-  return `${origin ?? getRequestOrigin(request)}${basePath}`;
+  switch (outputType) {
+    case "dsd":
+    case "json":
+      return `${origin ?? getRequestOrigin(request)}${basePath}`;
+    default:
+      return ".";
+  }
 }
 
 function getRequestOrigin(request: HonoRequest): string {
