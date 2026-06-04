@@ -33,6 +33,9 @@ export default async ({ mode }: ConfigEnv): Promise<UserConfig> => {
     },
     define: {
       "process.env.NODE_ENV": JSON.stringify(mode),
+      __VERSION__: JSON.stringify(
+        mode === "development" ? Date.now().toString() : pkg.version,
+      ),
     },
     experimental: {
       enableNativePlugin: true,
@@ -60,6 +63,7 @@ export default async ({ mode }: ConfigEnv): Promise<UserConfig> => {
 };
 
 interface PackageJson {
+  version: string;
   dependencies: Record<string, unknown>;
   peerDependencies?: Record<string, unknown> | undefined;
 }
