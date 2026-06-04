@@ -217,7 +217,7 @@ function writeDsdLinks(
     .join("\n");
 }
 
-function joinUrl(base: string | undefined, path: string): string {
+export function joinUrl(base: string | undefined, path: string): string {
   if (!base) return path;
   return trimEnd(base, "/") + "/" + trimStart(path, "/");
 }

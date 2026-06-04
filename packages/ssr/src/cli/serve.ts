@@ -17,7 +17,7 @@ import { isOutputType, OutputType, type ServeCommand } from "./parser";
 import { fileURLToPath } from "node:url";
 import { renderNotebook } from "..";
 import type { NotebookSnapshot } from "../types";
-import { readViteManifest, writeHtml } from "./build";
+import { joinUrl, readViteManifest, writeHtml } from "./build";
 import { Readable } from "node:stream";
 
 export async function serve(version: string, options: ServeCommand) {
@@ -96,7 +96,7 @@ async function createApp(
   app.on(
     ["HEAD", "GET"],
     "/assets/*",
-    serveStatic(assetDir, `${basePath}/assets`),
+    serveStatic(assetDir, origin, `${basePath}/assets`),
   );
 
   /// Notebook rendering
@@ -238,7 +238,11 @@ function notModified(request: HonoRequest, etag: string, mtime: Date): boolean {
   return false;
 }
 
-function serveStatic(directory: string, prefix: string): HonoHandler {
+function serveStatic(
+  directory: string,
+  origin: string | undefined,
+  prefix: string,
+): HonoHandler {
   return async (c) => {
     const filepath = path.resolve(
       directory,
@@ -265,6 +269,19 @@ function serveStatic(directory: string, prefix: string): HonoHandler {
     if (c.req.method === "HEAD") {
       c.header("Content-Length", file.size.toString());
       return c.body(null, 200);
+    } else if (c.req.path.endsWith(".css")) {
+      const css = await fs.readFile(filepath, { encoding: "utf8" });
+
+      let body = css;
+      for (const [match, file] of css.matchAll(/url\(\/assets\/([^)]+)\)/g)) {
+        const url = new URL(
+          joinUrl(prefix, file),
+          origin ?? getRequestOrigin(c.req),
+        );
+        body = body.replace(match, `url(${url.toString()})`);
+      }
+
+      return c.body(body, 200);
     } else {
       return c.body(
         Readable.toWeb(
