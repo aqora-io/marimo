@@ -3,7 +3,7 @@ import assert from "node:assert";
 import parse, { Element, Text } from "html-react-parser";
 import { renderToString as renderKatex } from "katex";
 import "katex/contrib/mhchem";
-import { createElement, type ReactElement, type ReactNode } from "react";
+import { createElement, type ReactNode } from "react";
 
 import * as api from "@marimo-team/marimo-api";
 import { UI_PLUGINS } from "@marimo-team/frontend/unstable_internal/plugins/plugins.ts";
@@ -53,6 +53,8 @@ export function prerenderNotebook({
   };
 }
 
+type HTMLReactParserNode = Exclude<ReactNode, number | bigint>;
+
 export function prerenderNotebookCell(cellId: string, html: string): ReactNode {
   html = sanitizeHtml(html);
   return parse(html, {
@@ -60,20 +62,21 @@ export function prerenderNotebookCell(cellId: string, html: string): ReactNode {
       if (!(domNode instanceof Element)) return;
 
       if (domNode.tagName === "marimo-ui-element") {
+        const objectId = domNode.attribs["object-id"];
         for (const child of domNode.children) {
           if (child instanceof Element) {
             const plugin = UI_PLUGINS.find(
               (plg) => plg.tagName === child.tagName,
             );
             if (plugin) {
-              return prenderCellDomNode(cellId, child, plugin) as ReactElement;
+              return prenderCellDomNode(cellId, objectId, child, plugin);
             }
           }
         }
       }
 
       if (domNode.tagName === "marimo-tex") {
-        return prerenderTex(extractInnerText(domNode)) as ReactElement;
+        return prerenderTex(extractInnerText(domNode));
       }
     },
   });
@@ -81,9 +84,10 @@ export function prerenderNotebookCell(cellId: string, html: string): ReactNode {
 
 export function prenderCellDomNode<S, D, F extends PluginFunctions>(
   cellId: string,
+  objectId: string,
   elm: Element,
   plugin: IPlugin<S, D, F>,
-): ReactNode {
+): HTMLReactParserNode {
   const data = plugin.validator.decode(extractElementDataset(elm));
 
   assert(elm.parent instanceof Element, "parent is not element");
@@ -124,13 +128,19 @@ export function prenderCellDomNode<S, D, F extends PluginFunctions>(
 
   const value = parseAttrValue<S>(elm.attribs["data-initial-value"]);
 
-  return plugin.render({
+  const rendered = plugin.render({
     host,
     functions,
     data,
     value,
-    setValue: () => {},
+    setValue: () => { },
   });
+
+  return createElement(
+    "div",
+    { className: "contents", "data-object-id": objectId },
+    rendered,
+  );
 }
 
 function extractElementDataset(elm: Element): Record<string, unknown> {
@@ -163,7 +173,7 @@ function extractInnerText(elm: Element): string {
   return Array.from(walkText(elm)).join("");
 }
 
-export function prerenderTex(tex: string): ReactNode {
+export function prerenderTex(tex: string): HTMLReactParserNode {
   // Required, even if empty. (see https://github.com/KaTeX/KaTeX/issues/2513)
   const macros = {
     // KaTeX doesn't support \mbox; map it to the equivalent \text
