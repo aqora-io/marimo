@@ -55,6 +55,7 @@ import { StatPlugin } from "./layout/StatPlugin";
 import { TexPlugin } from "./layout/TexPlugin";
 import type { IStatelessPlugin } from "./stateless-plugin";
 import type { IPlugin } from "./types";
+import { initializeEmbedded } from "./core/embedded";
 
 // List of UI plugins
 export const UI_PLUGINS: IPlugin<any, unknown>[] = [
@@ -117,6 +118,7 @@ export function initializePlugins() {
   // Initialize custom DOM elements
   initializeUIElement();
   initializeSidebarElement();
+  initializeEmbedded();
 
   // Initialize all the plugins.
   UI_PLUGINS.forEach(registerReactComponent);
