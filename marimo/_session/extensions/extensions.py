@@ -267,6 +267,9 @@ class CachingExtension(EventAwareExtension):
     def on_notification_sent(
         self, session: Session, notification: KernelMessage
     ) -> None:
+        if self.mode is not CacheMode.READ_WRITE:
+            return
+
         notification_data = deserialize_kernel_message(notification)
         if not isinstance(notification_data, CompletedRunNotification):
             return
