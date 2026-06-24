@@ -20,7 +20,7 @@ const showWatermark = isWasm() || isStaticNotebook();
 const RunPage = (props: Props) => {
   return (
     <PanelsWrapper>
-      <PanelGroup direction="horizontal" autoSaveId="marimo:chrome:v1:run1">
+      <PanelGroup direction="horizontal" autoSaveId="marimo:chrome:v1:run1" className="marimo-run-page">
         <Panel>
           <StaticBanner />
           <RunApp appConfig={props.appConfig} />
