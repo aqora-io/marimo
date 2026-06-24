@@ -29,7 +29,7 @@ const RunPage = (props: Props) => {
 
   return (
     <PanelsWrapper>
-      <PanelGroup direction="horizontal" autoSaveId="marimo:chrome:v1:run1">
+      <PanelGroup direction="horizontal" autoSaveId="marimo:chrome:v1:run1" className="marimo-run-page">
         <Panel>
           {!isExportedSlides && <StaticBanner />}
           <RunApp appConfig={props.appConfig} hideHeader={isExportedSlides} />
