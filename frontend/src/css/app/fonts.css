@@ -48,3 +48,19 @@ see frontend/src/core/static/download-html.ts */
   font-display: block;
   src: url("../../fonts/Fira_Mono/FiraMono-Bold.woff2") format("woff2");
 }
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: block;
+  src: url("../../fonts/Inter/Inter-VariableFont_opsz,wght.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Inter";
+  font-style: italic;
+  font-weight: 100 900;
+  font-display: block;
+  src: url("../../fonts/Inter/Inter-Italic-VariableFont_opsz,wght.woff2") format("woff2");
+}

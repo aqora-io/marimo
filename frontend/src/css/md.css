@@ -1,5 +1,10 @@
 @reference "../css/globals.css";
 
+.markdown {
+  --text-font: "Inter", sans-serif;
+  --heading-font: "Inter", sans-serif;
+}
+
 .markdown p:first-child,
 .markdown .paragraph:first-child {
   /* This is needed when markdown is used inside buttons or labels  */
