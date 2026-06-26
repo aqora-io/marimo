@@ -81,11 +81,11 @@ export const RunApp: React.FC<AppProps> = ({ appConfig, hideHeader }) => {
       onReconnect={reconnect}
     >
       <KernelStartupErrorModal />
-      <AppHeader
-        connection={connection}
-        className={hideHeader ? "hidden" : "sm:pt-8"}
-      >
-        {galleryHref && (
+      {galleryHref && (
+        <AppHeader
+          connection={connection}
+          className={hideHeader ? "hidden" : "sm:pt-8"}
+        >
           <div className="flex items-center px-6 pt-4 sm:-mt-8">
             <a
               href={galleryHref}
@@ -99,8 +99,8 @@ export const RunApp: React.FC<AppProps> = ({ appConfig, hideHeader }) => {
               <span>Back</span>
             </a>
           </div>
-        )}
-      </AppHeader>
+        </AppHeader>
+      )}
       <ProgressiveBoundary
         requires={canPaintRunAppAtom}
         delay={2000}
