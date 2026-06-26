@@ -60,7 +60,6 @@ export async function renderNotebook(
             <LocaleProvider>
               <ModalProvider>
                 <SlotzProvider controller={slotsController}>
-                  <div className="pt-8" />
                   <NotebookCells />
                 </SlotzProvider>
               </ModalProvider>

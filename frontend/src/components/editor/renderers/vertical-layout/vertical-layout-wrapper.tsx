@@ -22,14 +22,15 @@ export const VerticalLayoutWrapper: React.FC<PropsWithChildren<Props>> = ({
   innerClassName,
 }) => {
   const ref = useResponsiveEmbedRef<HTMLDivElement>();
+  const width = getAppWidth(appConfig, mode);
   return (
     <div
       className={cn(
         mode === "read"
-          ? "px-24"
+          ? "lg:px-24"
           : "px-1 sm:px-16 md:px-20 xl:px-24 print:px-0 print:pb-0",
-        // Large mobile bottom padding due to mobile browser navigation bar
-        "pb-24 sm:pb-12",
+        // // Large mobile bottom padding due to mobile browser navigation bar
+        // "pb-24 sm:pb-12",
         className,
       )}
       ref={ref}
@@ -37,14 +38,14 @@ export const VerticalLayoutWrapper: React.FC<PropsWithChildren<Props>> = ({
       <div
         className={cn(
           "m-auto",
-          // This padding needs to be the same from above to be correctly applied
-          "pb-24 sm:pb-12",
-          appConfig.width === "compact" &&
+          // // This padding needs to be the same from above to be correctly applied
+          // "pb-24 sm:pb-12",
+          width === "compact" &&
           "max-w-(--content-width) sm:min-w-[400px]",
-          appConfig.width === "medium" &&
+          width === "medium" &&
           "max-w-(--content-width-medium) sm:min-w-[400px]",
-          appConfig.width === "columns" && "w-fit",
-          appConfig.width === "full" && "max-w-full",
+          width === "columns" && "w-fit",
+          width === "full" && "max-w-full",
           // Hide the cells for a fake loading effect, to avoid flickering
           invisible && "invisible",
           innerClassName,
@@ -55,3 +56,7 @@ export const VerticalLayoutWrapper: React.FC<PropsWithChildren<Props>> = ({
     </div>
   );
 };
+
+function getAppWidth(config: AppConfig, mode: AppMode) {
+  return mode !== "read" ? config.width : "full";
+}
