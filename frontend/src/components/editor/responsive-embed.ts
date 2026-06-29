@@ -1,8 +1,12 @@
+import { hasCellsAtom } from "@/core/cells/cells";
+import { isConnectingAtom } from "@/core/network/connection";
 import { Logger } from "@/utils/Logger";
+import { atom, useStore } from "jotai";
 import { useEffect, useRef } from "react";
 
 export function useResponsiveEmbedRef<T extends HTMLElement>() {
   const ref = useRef<T>(null);
+  const store = useStore();
 
   useEffect(() => {
     if (window.parent === window) return;
@@ -50,9 +54,21 @@ export function useResponsiveEmbedRef<T extends HTMLElement>() {
         );
       }
     };
-    window.addEventListener("message", onWindowMessage);
+
+    const abort = new AbortController();
+
+    void (async () => {
+      await untilMarimoReady(store, abort.signal);
+      window.addEventListener("message", onWindowMessage);
+    })().catch((error) => {
+      if (!abort.signal.aborted) {
+        Logger.error(error);
+      }
+    });
+
 
     return () => {
+      abort.abort();
       window.removeEventListener("message", onWindowMessage);
       mo.disconnect();
       ro.disconnect();
@@ -60,4 +76,30 @@ export function useResponsiveEmbedRef<T extends HTMLElement>() {
   }, []);
 
   return ref;
+}
+
+type JotaiStore = ReturnType<typeof useStore>;
+
+const readyAtom = atom((get) => {
+  const isConnecting = get(isConnectingAtom);
+  const hasCells = get(hasCellsAtom);
+  return !isConnecting && hasCells;
+});
+
+function untilMarimoReady(store: JotaiStore, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const unsub = store.sub(readyAtom, () => {
+      const isReady = store.get(readyAtom);
+      if (isReady) {
+        unsub();
+        resolve();
+      }
+    });
+
+    signal?.addEventListener("abort", () => {
+      unsub();
+      reject(new Error("Aborted"));
+    });
+
+  });
 }
