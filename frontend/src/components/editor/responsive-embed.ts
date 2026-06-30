@@ -1,5 +1,6 @@
-import { hasCellsAtom } from "@/core/cells/cells";
-import { isConnectingAtom } from "@/core/network/connection";
+import { notebookAtom, type NotebookState } from "@/core/cells/cells";
+import { SCRATCH_CELL_ID } from "@/core/cells/ids";
+import { connectionAtom } from "@/core/network/connection";
 import { Logger } from "@/utils/Logger";
 import { atom, useStore } from "jotai";
 import { useEffect, useRef } from "react";
@@ -9,10 +10,16 @@ export function useResponsiveEmbedRef<T extends HTMLElement>() {
   const store = useStore();
 
   useEffect(() => {
-    if (window.parent === window) return;
+    if (window.parent === window) {
+      return;
+    }
 
     const root = ref.current;
-    if (!root) return;
+    if (!root) {
+      return;
+    }
+
+    let unsub: (() => void) | undefined;
 
     const measureHeight = () => {
       // const children: HTMLElement[] = Array.prototype.slice.call(root.children);
@@ -45,9 +52,16 @@ export function useResponsiveEmbedRef<T extends HTMLElement>() {
         );
         ro.observe(root);
         mo.observe(root, { childList: true, subtree: true });
+        unsub?.();
+        unsub = store.sub(readinessAtom, () => {
+          const readiness = store.get(readinessAtom);
+          window.parent.postMessage(readiness, "*");
+        });
       } else if (event.data === "bye") {
         mo.disconnect();
         ro.disconnect();
+        unsub?.();
+        unsub = undefined;
       } else {
         Logger.error(
           `Invalid message=${JSON.stringify(event.data)} from origin=${event.origin}`,
@@ -55,51 +69,38 @@ export function useResponsiveEmbedRef<T extends HTMLElement>() {
       }
     };
 
-    const abort = new AbortController();
-
-    void (async () => {
-      await untilMarimoReady(store, abort.signal);
-      window.addEventListener("message", onWindowMessage);
-    })().catch((error) => {
-      if (!abort.signal.aborted) {
-        Logger.error(error);
-      }
-    });
-
-
+    window.addEventListener("message", onWindowMessage);
     return () => {
-      abort.abort();
       window.removeEventListener("message", onWindowMessage);
       mo.disconnect();
       ro.disconnect();
+      unsub?.();
     };
   }, []);
 
   return ref;
 }
 
-type JotaiStore = ReturnType<typeof useStore>;
+type Readiness = "connecting" | "running" | "ready";
 
-const readyAtom = atom((get) => {
-  const isConnecting = get(isConnectingAtom);
-  const hasCells = get(hasCellsAtom);
-  return !isConnecting && hasCells;
+const readinessAtom = atom<Readiness>((get) => {
+  const connection = get(connectionAtom);
+  const notebook = get(notebookAtom);
+
+  if (connection.state !== "OPEN") {
+    return "connecting";
+  } else if (!notebookHasCompleted(notebook)) {
+    return "running";
+  }
+  return "ready";
 });
 
-function untilMarimoReady(store: JotaiStore, signal?: AbortSignal): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const unsub = store.sub(readyAtom, () => {
-      const isReady = store.get(readyAtom);
-      if (isReady) {
-        unsub();
-        resolve();
-      }
-    });
-
-    signal?.addEventListener("abort", () => {
-      unsub();
-      reject(new Error("Aborted"));
-    });
-
-  });
+function notebookHasCompleted(notebook: NotebookState): boolean {
+  const runtimes = Object.entries(notebook.cellRuntime).filter(
+    ([id]) => id !== SCRATCH_CELL_ID,
+  );
+  return (
+    runtimes.length > 0 &&
+    runtimes.every(([_id, cell]) => cell.output !== null || cell.errored)
+  );
 }
