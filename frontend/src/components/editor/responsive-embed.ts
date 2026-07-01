@@ -1,5 +1,6 @@
-import { hasCellsAtom, notebookIsRunningAtom } from "@/core/cells/cells";
-import { isConnectingAtom } from "@/core/network/connection";
+import { notebookAtom, type NotebookState } from "@/core/cells/cells";
+import { SCRATCH_CELL_ID } from "@/core/cells/ids";
+import { connectionAtom } from "@/core/network/connection";
 import { Logger } from "@/utils/Logger";
 import { atom, useStore } from "jotai";
 import { useEffect, useRef } from "react";
@@ -79,14 +80,18 @@ export function useResponsiveEmbedRef<T extends HTMLElement>() {
 type Readiness = "connecting" | "running" | "ready";
 
 const readinessAtom = atom<Readiness>((get) => {
-  const isConnecting = get(isConnectingAtom);
-  const isRunning = get(notebookIsRunningAtom);
-  const hasCells = get(hasCellsAtom);
+  const connection = get(connectionAtom);
+  const notebook = get(notebookAtom);
 
-  if (isConnecting || !hasCells) {
+  if (connection.state !== "OPEN") {
     return "connecting";
-  } else if (isRunning) {
+  } else if (!notebookHasCompleted(notebook)) {
     return "running";
   }
   return "ready";
 });
+
+function notebookHasCompleted(notebook: NotebookState): boolean {
+  const runtimes = Object.entries(notebook.cellRuntime).filter(([id]) => id !== SCRATCH_CELL_ID);
+  return runtimes.length > 0 && runtimes.every(([_id, cell]) => cell.output !== null || cell.errored);
+}
