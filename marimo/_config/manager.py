@@ -1,5 +1,6 @@
 # Copyright 2026 Marimo. All rights reserved.
 from __future__ import annotations
+import json
 
 import os
 from abc import abstractmethod
@@ -23,6 +24,7 @@ from marimo._config.config import (
     WidthType,
     merge_config,
     merge_default_config,
+    VenvConfig,
 )
 from marimo._config.packages import PackageManagerKind
 from marimo._config.reader import (
@@ -124,6 +126,10 @@ class MarimoConfigReader:
         if "experimental" in self._config:
             return self._config["experimental"]
         return {}
+
+    @property
+    def venv(self) -> VenvConfig:
+        return self._config.get("venv", {})
 
 
 class MarimoConfigManager(MarimoConfigReader):

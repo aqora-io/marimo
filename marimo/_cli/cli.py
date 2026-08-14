@@ -554,9 +554,9 @@ def edit(
                 "marimo[sandbox]",
             )
 
-        # Enable script metadata management for sandboxed notebooks
-        os.environ["MARIMO_MANAGE_SCRIPT_METADATA"] = "true"
-        GLOBAL_SETTINGS.MANAGE_SCRIPT_METADATA = True
+        # # Enable script metadata management for sandboxed notebooks
+        # os.environ["MARIMO_MANAGE_SCRIPT_METADATA"] = "true"
+        # GLOBAL_SETTINGS.MANAGE_SCRIPT_METADATA = True
 
     # Check shared memory availability early (required for edit mode to
     # communicate between the server process and kernel subprocess)
