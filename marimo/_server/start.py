@@ -286,12 +286,15 @@ def start(
         os.environ["MARIMO_SANDBOX_BACKEND"] = sandbox
         GLOBAL_SETTINGS.SANDBOX_BACKEND = sandbox
         if mode == SessionMode.EDIT:
-            os.environ["MARIMO_MANAGE_SCRIPT_METADATA"] = "true"
-            GLOBAL_SETTINGS.MANAGE_SCRIPT_METADATA = True
+            # os.environ["MARIMO_MANAGE_SCRIPT_METADATA"] = "true"
+            # GLOBAL_SETTINGS.MANAGE_SCRIPT_METADATA = True
             os.environ["MARIMO_SANDBOX_MODE"] = "multi"
             GLOBAL_SETTINGS.SANDBOX_MODE = "multi"
 
-    if GLOBAL_SETTINGS.MANAGE_SCRIPT_METADATA:
+    venv_config = config_reader.venv
+    if GLOBAL_SETTINGS.MANAGE_SCRIPT_METADATA and not venv_config.get("path"):
+        os.environ["MARIMO_MANAGE_SCRIPT_METADATA"] = "true"
+        GLOBAL_SETTINGS.MANAGE_SCRIPT_METADATA = True
         config_reader = config_reader.with_overrides(
             {
                 # Currently, only uv is supported for managing script metadata
