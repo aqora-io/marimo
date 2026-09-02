@@ -21,10 +21,12 @@ export function hasQueryParam(key: string, value?: string): boolean {
   return urlParams.get(key) === value;
 }
 
+export function newNotebookId() {
+  return `__new__${generateSessionId()}`;
+}
+
 export function newNotebookURL() {
-  const sessionId = generateSessionId();
-  const initializationId = `__new__${sessionId}`;
-  return asURL(`?file=${encodeURIComponent(initializationId)}`).toString();
+  return asURL(`?file=${encodeURIComponent(newNotebookId())}`).toString();
 }
 
 const urlRegex = /^(https?:\/\/\S+)$/;

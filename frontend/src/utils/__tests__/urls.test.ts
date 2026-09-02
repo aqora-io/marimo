@@ -4,7 +4,13 @@ import {
   EDGE_CASE_FILENAMES,
   URL_SPECIAL_CHAR_FILENAMES,
 } from "../../__tests__/mocks";
-import { appendQueryParams, isUrl, updateQueryParams } from "../urls";
+import {
+  appendQueryParams,
+  isUrl,
+  newNotebookId,
+  newNotebookURL,
+  updateQueryParams,
+} from "../urls";
 
 describe("isUrl", () => {
   it("should return true for a valid URL", () => {
@@ -225,5 +231,16 @@ describe("appendQueryParams", () => {
     expect(result).toContain("/about?");
     const url = new URL(result, "http://example.com");
     expect(url.searchParams.get("path")).toBe("folder/file with spaces.py");
+  });
+});
+
+describe("newNotebookId / newNotebookURL", () => {
+  it("newNotebookId is a __new__-prefixed initialization id", () => {
+    expect(newNotebookId()).toMatch(/^__new__\S+$/);
+  });
+
+  it("newNotebookURL points ?file= at a new initialization id", () => {
+    const file = new URL(newNotebookURL()).searchParams.get("file");
+    expect(file).toMatch(/^__new__\S+$/);
   });
 });

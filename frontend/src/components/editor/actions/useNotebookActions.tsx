@@ -72,11 +72,13 @@ import { kioskModeAtom, viewStateAtom } from "@/core/mode";
 import { useRequestClient } from "@/core/network/requests";
 import { useFilename } from "@/core/saving/filename";
 import { createShareableLink } from "@/core/wasm/share";
+import { isEmbedded } from "@/core/vscode/vscode-bindings";
 import { isWasm } from "@/core/wasm/utils";
 import { copyToClipboard } from "@/utils/copy";
 import { Objects } from "@/utils/objects";
 import { Strings } from "@/utils/strings";
-import { newNotebookURL } from "@/utils/urls";
+import { openNotebook } from "@/utils/links";
+import { newNotebookId } from "@/utils/urls";
 import { useRunAllCells } from "../cell/useRunCells";
 import { useChromeActions, useChromeState } from "../chrome/state";
 import { isPanelHidden, PANELS } from "../chrome/types";
@@ -618,7 +620,7 @@ export function useNotebookActions({
       label: "Open home",
       // If file is in the url, then we ran `marimo edit`
       // without a specific file
-      hidden: !location.search.includes("file"),
+      hidden: !location.search.includes("file") || isEmbedded,
       handle: () => {
         const withoutSearch = document.baseURI.split("?")[0];
         window.open(withoutSearch, "_blank", "noopener");
@@ -632,8 +634,7 @@ export function useNotebookActions({
       // without a specific file
       hidden: !location.search.includes("file"),
       handle: () => {
-        const url = newNotebookURL();
-        window.open(url, "_blank");
+        openNotebook(newNotebookId());
       },
     },
   ];
