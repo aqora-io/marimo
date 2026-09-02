@@ -100,7 +100,7 @@ const serveParser = () =>
     ),
     accessToken: optional(
       option("--token", string({ metavar: "TOKEN" }), {
-        description: message`Requests without this token in their querystring will be denied`,
+        description: message`Requests without this token will be denied: notebooks take it as ?access_token=, the /api status endpoints also as an Authorization: Bearer header`,
       }),
     ),
   });

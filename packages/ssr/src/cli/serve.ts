@@ -18,6 +18,7 @@ import { fileURLToPath } from "node:url";
 import { renderNotebook } from "..";
 import type { NotebookSnapshot } from "../types";
 import { joinUrl, readViteManifest, writeHtml } from "./build";
+import { ActivityTracker, statusApi, trackActivity } from "./status";
 import { Readable } from "node:stream";
 
 export async function serve(version: string, options: ServeCommand) {
@@ -89,6 +90,10 @@ async function createApp(
     await next();
   });
 
+  /// Activity and version for kubimo's idle collector
+  const activity = new ActivityTracker();
+  app.route("/", statusApi({ version, accessToken, activity }));
+
   /// Health endpoint
   app.get("/health", (c) => c.text("ok"));
 
@@ -96,11 +101,12 @@ async function createApp(
   app.on(
     ["HEAD", "GET"],
     "/assets/*",
+    trackActivity(activity),
     serveStatic(assetDir, origin, `${basePath}/assets`),
   );
 
   /// Notebook rendering
-  app.on(["HEAD", "GET"], "/:filename", async (c) => {
+  app.on(["HEAD", "GET"], "/:filename", trackActivity(activity), async (c) => {
     if (
       accessToken !== undefined &&
       c.req.query("access_token") !== accessToken
