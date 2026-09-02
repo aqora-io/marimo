@@ -10,10 +10,14 @@ export function useResponsiveEmbedRef<T extends HTMLElement>() {
   const store = useStore();
 
   useEffect(() => {
-    if (window.parent === window) return;
+    if (window.parent === window) {
+      return;
+    }
 
     const root = ref.current;
-    if (!root) return;
+    if (!root) {
+      return;
+    }
 
     let unsub: (() => void) | undefined;
 
@@ -92,6 +96,11 @@ const readinessAtom = atom<Readiness>((get) => {
 });
 
 function notebookHasCompleted(notebook: NotebookState): boolean {
-  const runtimes = Object.entries(notebook.cellRuntime).filter(([id]) => id !== SCRATCH_CELL_ID);
-  return runtimes.length > 0 && runtimes.every(([_id, cell]) => cell.output !== null || cell.errored);
+  const runtimes = Object.entries(notebook.cellRuntime).filter(
+    ([id]) => id !== SCRATCH_CELL_ID,
+  );
+  return (
+    runtimes.length > 0 &&
+    runtimes.every(([_id, cell]) => cell.output !== null || cell.errored)
+  );
 }

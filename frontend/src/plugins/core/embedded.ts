@@ -7,19 +7,27 @@ import { Logger } from "@/utils/Logger";
 type HTMLButtonSelector = "button";
 
 export function initializeEmbedded() {
-  if (window.parent === window) return;
+  if (window.parent === window) {
+    return;
+  }
 
   window.addEventListener("message", (event) => {
     const data = Message.safeParse(event.data);
-    if (!data.success) return;
+    if (!data.success) {
+      return;
+    }
 
     const entry = UI_ELEMENT_REGISTRY.entries.get(
       data.data.objectId as UIElementId,
     );
-    if (!entry) return;
+    if (!entry) {
+      return;
+    }
 
     const element = entry.elements.values().next().value;
-    if (!element || !element.shadowRoot) return;
+    if (!element || !element.shadowRoot) {
+      return;
+    }
 
     switch (data.data.message) {
       case "click":
@@ -49,7 +57,9 @@ export function initializeEmbedded() {
               const matches = element.shadowRoot.querySelectorAll(
                 `button[data-testid="${CSS.escape(data.data.testid)}"]` as HTMLButtonSelector,
               );
-              if (matches.length !== 1) break;
+              if (matches.length !== 1) {
+                break;
+              }
               matches[0].click();
             }
             break;

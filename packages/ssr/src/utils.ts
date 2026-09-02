@@ -11,7 +11,7 @@ export class VirtualBrowserEnvironment {
 
   constructor({ html, signal }: VirtualBrowserEnvironmentInit = {}) {
     this.jsdom = new JSDOM(html);
-    this.prev = poluteGlobals({
+    this.prev = polluteGlobals({
       window: this.jsdom.window,
       document: this.jsdom.window.document,
       InputEvent: class InputEvent {},
@@ -21,13 +21,13 @@ export class VirtualBrowserEnvironment {
 
   dispose = () => {
     this.jsdom.window.close();
-    poluteGlobals(this.prev);
+    polluteGlobals(this.prev);
   };
 
   [Symbol.dispose] = this.dispose;
 }
 
-function poluteGlobals(globals: object): object {
+function polluteGlobals(globals: object): object {
   const prev: Partial<typeof globalThis> = {};
   for (const attr in globals) {
     // @ts-ignore
