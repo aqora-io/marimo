@@ -168,10 +168,12 @@ async function createApp(
     }
 
     const snapshot: NotebookSnapshot = {
-      session: JSON.parse(await fs.readFile(sessionPath, { encoding: "utf8" })),
+      session: JSON.parse(
+        await fs.readFile(sessionPath, { encoding: "utf8" }),
+      ) as NotebookSnapshot["session"],
       notebook: JSON.parse(
         await fs.readFile(notebookPath, { encoding: "utf8" }),
-      ),
+      ) as NotebookSnapshot["notebook"],
     };
 
     let html;

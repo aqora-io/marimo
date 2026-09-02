@@ -32,8 +32,8 @@ export async function build(options: BuildCommand) {
   const manifest = await readViteManifest();
 
   const snapshot: NotebookSnapshot = {
-    session: JSON.parse(sessionFile),
-    notebook: JSON.parse(notebookFile),
+    session: JSON.parse(sessionFile) as NotebookSnapshot["session"],
+    notebook: JSON.parse(notebookFile) as NotebookSnapshot["notebook"],
   };
 
   const html = await renderNotebook(snapshot, { hideCode: options.hideCode });
@@ -75,7 +75,7 @@ export async function readViteManifest(): Promise<ViteManifest> {
         encoding: "utf8",
       },
     ),
-  );
+  ) as ViteManifest;
 }
 
 export function writeHtml(

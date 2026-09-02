@@ -63,7 +63,7 @@ export class UIElementRegistry {
       {},
       {
         get: (_target, prop, _recv) => {
-          // @ts-ignore
+          // @ts-expect-error
           return UIElementRegistry.INSTANCE[prop];
         },
       },

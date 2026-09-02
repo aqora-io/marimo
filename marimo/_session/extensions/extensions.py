@@ -46,8 +46,8 @@ from marimo._session.state.serialize import (
     _script_metadata_hash,
     get_notebook_cache_file,
     get_session_cache_file,
-    serialize_session_view,
     serialize_notebook,
+    serialize_session_view,
 )
 from marimo._session.types import (
     KernelManager,
@@ -281,21 +281,21 @@ class CachingExtension(EventAwareExtension):
         if notebook_path is None:
             return
 
-        notebook_path = Path(notebook_path)
+        notebook_file = Path(notebook_path)
 
-        session_cache = get_session_cache_file(notebook_path)
+        session_cache = get_session_cache_file(notebook_file)
         LOGGER.debug(f"Writing {session_cache=}...")
 
         session_snapshot = serialize_session_view(
             session.session_view,
             cell_ids=session.document.cell_ids,
-            script_metadata_hash=_script_metadata_hash(notebook_path),
+            script_metadata_hash=_script_metadata_hash(notebook_file),
             drop_virtual_file_outputs=True,
         )
         session_cache.parent.mkdir(parents=True, exist_ok=True)
         session_cache.write_text(json.dumps(session_snapshot, indent=2))
 
-        notebook_cache = get_notebook_cache_file(notebook_path)
+        notebook_cache = get_notebook_cache_file(notebook_file)
         LOGGER.debug(f"Writing {notebook_cache=}...")
 
         notebook_snapshot = serialize_notebook(

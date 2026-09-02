@@ -84,7 +84,9 @@ function setupThemeListener(): void {
 setupThemeListener();
 
 function getVsCodeTheme(): "light" | "dark" | undefined {
-  if (import.meta.env.SSR) return;
+  if (import.meta.env.SSR) {
+    return;
+  }
 
   const kind = document.body.dataset.vscodeThemeKind;
   switch (kind) {

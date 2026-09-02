@@ -53,9 +53,7 @@ export function sanitizeHtml(html: string) {
     // but this is only used for HTML content.
     SAFE_FOR_XML: !html.includes("marimo-mermaid"),
   };
-  if (import.meta.env.SSR) {
-    return DOMPurify(window).sanitize(html, sanitizationOptions);
-  } else {
-    return DOMPurify.sanitize(html, sanitizationOptions);
-  }
+  return import.meta.env.SSR
+    ? DOMPurify(window).sanitize(html, sanitizationOptions)
+    : DOMPurify.sanitize(html, sanitizationOptions);
 }
