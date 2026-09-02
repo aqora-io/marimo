@@ -1,7 +1,7 @@
 /* Copyright 2026 Marimo. All rights reserved. */
 
 import { CheckIcon, CopyIcon } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DialogContent,
@@ -14,47 +14,25 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { copyToClipboard } from "@/utils/copy";
 import { Events } from "@/utils/events";
 import { Tooltip } from "@/components/ui/tooltip";
-import { asRemoteURL, useRuntimeManager } from "@/core/runtime/config";
-import { API } from "@/core/network/api";
+import { useRuntimeManager } from "@/core/runtime/config";
+import { getSessionId } from "@/core/kernel/session";
 import {
   AGENT_LABELS,
   AGENT_TABS,
   type AgentTab,
-  type ConnectionInfo,
-  getFileFromURL,
-  getRawPrompt,
+  CLI_INSTALL,
+  getRunnerIdFromURL,
   getTerminalCommand,
-  maskToken,
   SKILL_INSTALL,
-  TERMINAL_TABS,
 } from "./pair-with-agent-commands";
-
-function useAuthToken(): string | null {
-  const [token, setToken] = useState<string | null>(null);
-  useEffect(() => {
-    fetch(asRemoteURL("/auth/token").href, {
-      headers: API.headers(),
-    })
-      .then((res) =>
-        res.ok ? (res.json() as Promise<{ token: string | null }>) : null,
-      )
-      .then((data) => setToken(data?.token ?? null))
-      .catch(() => setToken(null));
-  }, []);
-  return token;
-}
 
 export const PairWithAgentModal: React.FC<{
   onClose: () => void;
 }> = ({ onClose }) => {
   const [activeTab, setActiveTab] = useState<AgentTab>("claude");
   const runtimeManager = useRuntimeManager();
-  const authToken = useAuthToken();
-  const hasToken = Boolean(authToken);
-  const connection: ConnectionInfo = {
-    url: runtimeManager.httpURL.toString(),
-    file: getFileFromURL(window.location.href),
-  };
+  const runnerId = getRunnerIdFromURL(runtimeManager.httpURL.toString());
+  const sessionId = getSessionId();
 
   return (
     <DialogContent className="sm:max-w-2xl">
@@ -76,75 +54,58 @@ export const PairWithAgentModal: React.FC<{
       </DialogHeader>
 
       <div className="flex flex-col gap-4 py-2">
-        <Tabs
-          value={activeTab}
-          onValueChange={(v) => setActiveTab(v as AgentTab)}
-        >
-          <TabsList className="w-full">
-            {AGENT_TABS.map((tab) => (
-              <TabsTrigger key={tab} value={tab} className="flex-1">
-                {AGENT_LABELS[tab]}
-              </TabsTrigger>
-            ))}
-          </TabsList>
+        {runnerId === undefined ? (
+          <p className="text-sm text-muted-foreground">
+            This notebook is not served by an aqora workspace runner.
+          </p>
+        ) : (
+          <Tabs
+            value={activeTab}
+            onValueChange={(v) => setActiveTab(v as AgentTab)}
+          >
+            <TabsList className="w-full">
+              {AGENT_TABS.map((tab) => (
+                <TabsTrigger key={tab} value={tab} className="flex-1">
+                  {AGENT_LABELS[tab]}
+                </TabsTrigger>
+              ))}
+            </TabsList>
 
-          {TERMINAL_TABS.map((tab) => (
-            <TabsContent
-              key={tab}
-              value={tab}
-              className="mt-4 flex flex-col gap-4"
-            >
-              <Step
-                index={1}
-                title="Install the skill"
-                hint="Run once per machine."
+            {AGENT_TABS.map((tab) => (
+              <TabsContent
+                key={tab}
+                value={tab}
+                className="mt-4 flex flex-col gap-4"
               >
-                <CommandBlock command={SKILL_INSTALL} />
-              </Step>
-              <Step index={2} title="Run in your terminal">
-                <CommandBlock
-                  command={getTerminalCommand(tab, connection, hasToken)}
-                />
-              </Step>
-              {hasToken && authToken && (
-                <Step index={3} title="Paste when prompted for a token">
+                <Step
+                  index={1}
+                  title="Install the aqora CLI and the marimo-pair skill"
+                  hint="Run once per machine."
+                >
+                  <CommandBlock command={CLI_INSTALL} />
+                  <CommandBlock command={SKILL_INSTALL} />
+                </Step>
+                <Step
+                  index={2}
+                  title={
+                    tab === "prompt"
+                      ? "Run in your terminal, then paste the printed prompt into your agent"
+                      : "Run in your terminal"
+                  }
+                  hint={
+                    tab === "prompt"
+                      ? "For any agent that has the marimo-pair skill."
+                      : undefined
+                  }
+                >
                   <CommandBlock
-                    command={authToken}
-                    display={maskToken(authToken)}
+                    command={getTerminalCommand(tab, { runnerId, sessionId })}
                   />
                 </Step>
-              )}
-            </TabsContent>
-          ))}
-
-          <TabsContent value="prompt" className="mt-4 flex flex-col gap-4">
-            <Step
-              index={1}
-              title="Make sure the marimo-pair skill is available to your agent"
-              hint="Skip if your agent already has it."
-            >
-              <CommandBlock command={SKILL_INSTALL} />
-            </Step>
-            <Step
-              index={2}
-              title="Copy this prompt into your agent"
-              hint={
-                hasToken
-                  ? "Includes your auth token — keep it private."
-                  : undefined
-              }
-            >
-              <CommandBlock
-                command={getRawPrompt(connection, authToken)}
-                display={getRawPrompt(
-                  connection,
-                  authToken ? maskToken(authToken) : null,
-                )}
-                multiline={true}
-              />
-            </Step>
-          </TabsContent>
-        </Tabs>
+              </TabsContent>
+            ))}
+          </Tabs>
+        )}
       </div>
 
       <DialogFooter>
@@ -173,11 +134,7 @@ const Step: React.FC<{
   </div>
 );
 
-const CommandBlock: React.FC<{
-  command: string;
-  display?: string;
-  multiline?: boolean;
-}> = ({ command, display, multiline = false }) => {
+const CommandBlock: React.FC<{ command: string }> = ({ command }) => {
   const [copied, setCopied] = useState(false);
 
   const copy = Events.stopPropagation(async (e) => {
@@ -187,35 +144,9 @@ const CommandBlock: React.FC<{
     setTimeout(() => setCopied(false), 2000);
   });
 
-  if (multiline) {
-    return (
-      <div className="relative rounded-md bg-muted">
-        <pre className="max-h-64 overflow-auto whitespace-pre-wrap wrap-break-word px-3 py-2 pr-10 font-mono text-xs select-all">
-          {display ?? command}
-        </pre>
-        <Tooltip content="Copied!" open={copied}>
-          <Button
-            onClick={copy}
-            size="xs"
-            variant="ghost"
-            className="absolute right-1 top-1"
-          >
-            {copied ? (
-              <CheckIcon size={14} strokeWidth={1.5} />
-            ) : (
-              <CopyIcon size={14} strokeWidth={1.5} />
-            )}
-          </Button>
-        </Tooltip>
-      </div>
-    );
-  }
-
   return (
     <div className="flex items-center gap-2 rounded-md bg-muted px-3 py-2 font-mono text-xs">
-      <code className="flex-1 select-all wrap-break-word">
-        {display ?? command}
-      </code>
+      <code className="flex-1 select-all wrap-break-word">{command}</code>
       <Tooltip content="Copied!" open={copied}>
         <Button onClick={copy} size="xs" variant="ghost">
           {copied ? (
