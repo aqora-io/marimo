@@ -23,6 +23,7 @@
   },
   "devDependencies": {
     "@babel/plugin-proposal-decorators": "^7.28.6",
+    "@babel/preset-typescript": "^7.25.9",
     "@csstools/postcss-light-dark-function": "^2.0.11",
     "@marimo-team/frontend": "workspace:*",
     "@marimo-team/marimo-api": "workspace:*",

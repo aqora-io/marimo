@@ -63,10 +63,14 @@ function subscribeToFullScreen(onStoreChange: () => void) {
  * element enters or leaves full screen.
  */
 export function useIsFullScreen(ref: RefObject<Element | null>): boolean {
-  return useSyncExternalStore(subscribeToFullScreen, () => {
-    const fullScreenElement = document.fullscreenElement;
-    return fullScreenElement !== null && fullScreenElement === ref.current;
-  });
+  return useSyncExternalStore(
+    subscribeToFullScreen,
+    () => {
+      const fullScreenElement = document.fullscreenElement;
+      return fullScreenElement !== null && fullScreenElement === ref.current;
+    },
+    () => false,
+  );
 }
 
 /**
