@@ -115,13 +115,26 @@ def backend_from_flag(sandbox: str | None) -> SandboxBackend:
 
 
 def ensure_server_environment(
-    backend: SandboxBackend | None, *, stdin_notebook: str | None = None
+    backend: SandboxBackend | None,
+    *,
+    stdin_notebook: str | None = None,
+    current_path: str | None = None,
 ) -> None:
-    """Relaunch the editor with server tools, leaving kernels lazy."""
+    """Relaunch the editor with server tools, leaving kernels lazy.
+
+    A workspace with `[tool.marimo.venv].path` configured is owned by the
+    host: kernels run in that venv, so the server runs as invoked rather
+    than through a tooling overlay that would rewrite its environment.
+    """
     if (
         backend is None
         or os.environ.pop("MARIMO_SERVER_OVERLAY", None) is not None
     ):
+        return
+
+    from marimo._config.manager import get_default_config_manager
+
+    if get_default_config_manager(current_path=current_path).venv.get("path"):
         return
 
     from marimo._environments.backends import launch_server

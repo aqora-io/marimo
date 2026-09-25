@@ -561,7 +561,9 @@ def edit(
     sandbox_backend = resolve_sandbox(
         sandbox=sandbox, no_sandbox=no_sandbox, name=name
     )
-    ensure_server_environment(sandbox_backend, stdin_notebook=stdin_notebook)
+    ensure_server_environment(
+        sandbox_backend, stdin_notebook=stdin_notebook, current_path=name
+    )
 
     # Check shared memory availability early (required for edit mode to
     # communicate between the server process and kernel subprocess)

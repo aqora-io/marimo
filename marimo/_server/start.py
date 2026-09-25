@@ -10,7 +10,7 @@ from urllib.parse import urlparse
 import uvicorn
 
 from marimo._cli.print import echo
-from marimo._config.config import PartialMarimoConfig
+from marimo._config.config import PartialMarimoConfig, VenvConfig
 from marimo._config.manager import get_default_config_manager
 from marimo._config.settings import GLOBAL_SETTINGS
 from marimo._environments.sandbox import Backend
@@ -185,6 +185,24 @@ def _resolve_proxy(port: int, host: str, proxy: str | None) -> tuple[int, str]:
     return external_port, external_host
 
 
+def _configure_sandbox(
+    sandbox: Backend | None, mode: SessionMode, venv_config: VenvConfig
+) -> None:
+    """Publish the sandbox backend and mode to this process and its kernels.
+
+    A configured venv is owned by the host: its notebooks are not script
+    sandboxes, so "multi" mode stays off and the packages panel keeps
+    targeting the project rather than each notebook's inline metadata.
+    """
+    if sandbox is None:
+        return
+    os.environ["MARIMO_SANDBOX_BACKEND"] = sandbox
+    GLOBAL_SETTINGS.SANDBOX_BACKEND = sandbox
+    if mode == SessionMode.EDIT and not venv_config.get("path"):
+        os.environ["MARIMO_SANDBOX_MODE"] = "multi"
+        GLOBAL_SETTINGS.SANDBOX_MODE = "multi"
+
+
 def start(
     *,
     workspace: NotebookWorkspace,
@@ -282,16 +300,9 @@ def start(
             "trusted directories and authentication controls."
         )
 
-    if sandbox is not None:
-        os.environ["MARIMO_SANDBOX_BACKEND"] = sandbox
-        GLOBAL_SETTINGS.SANDBOX_BACKEND = sandbox
-        if mode == SessionMode.EDIT:
-            # os.environ["MARIMO_MANAGE_SCRIPT_METADATA"] = "true"
-            # GLOBAL_SETTINGS.MANAGE_SCRIPT_METADATA = True
-            os.environ["MARIMO_SANDBOX_MODE"] = "multi"
-            GLOBAL_SETTINGS.SANDBOX_MODE = "multi"
-
     venv_config = config_reader.venv
+    _configure_sandbox(sandbox, mode, venv_config)
+
     if GLOBAL_SETTINGS.MANAGE_SCRIPT_METADATA and not venv_config.get("path"):
         os.environ["MARIMO_MANAGE_SCRIPT_METADATA"] = "true"
         GLOBAL_SETTINGS.MANAGE_SCRIPT_METADATA = True

@@ -835,3 +835,46 @@ def test_editor_reports_unsupported_sandbox_backend(
     )
     assert result.exit_code == 1
     assert "Error: pixi is too old for script environments" in result.output
+
+
+def _write_venv_config(workspace: Path) -> None:
+    (workspace / "pyproject.toml").write_text(
+        '[tool.marimo.venv]\npath = "/opt/venv"\n', encoding="utf-8"
+    )
+
+
+def test_editor_relaunches_without_configured_venv(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from unittest.mock import patch
+
+    from marimo._cli.sandbox import ensure_server_environment
+
+    monkeypatch.delenv("MARIMO_SERVER_OVERLAY", raising=False)
+    with (
+        patch("marimo._cli.sandbox.require_sandbox_backend"),
+        patch("marimo._environments.backends.launch_server") as launch,
+        patch("marimo._cli.sandbox._wait_on_plan", return_value=0),
+        pytest.raises(SystemExit),
+    ):
+        ensure_server_environment("uv", current_path=str(tmp_path))
+    launch.assert_called_once()
+
+
+def test_editor_skips_relaunch_with_configured_venv(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A configured venv is owned by the host, not by marimo: the server
+    runs as invoked instead of being re-exec'd through a tooling overlay."""
+    from unittest.mock import patch
+
+    from marimo._cli.sandbox import ensure_server_environment
+
+    _write_venv_config(tmp_path)
+    monkeypatch.delenv("MARIMO_SERVER_OVERLAY", raising=False)
+    with (
+        patch("marimo._cli.sandbox.require_sandbox_backend"),
+        patch("marimo._environments.backends.launch_server") as launch,
+    ):
+        ensure_server_environment("uv", current_path=str(tmp_path))
+    launch.assert_not_called()
