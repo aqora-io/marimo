@@ -3,11 +3,13 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
 from marimo import _loggers
+from marimo._environments.errors import EnvironmentManagerError
 from marimo._utils.versions import is_editable
 from marimo._version import __version__
 
@@ -48,9 +50,10 @@ class RuntimeOverlay:
 
     # Properties
 
-    * `runtime` is the marimo the launched process must import, either
-      `marimo[<extras>]==<version>` or `-e <path>` when marimo runs from a
-      development checkout. Every overlay has one; see below.
+    * `runtime` is the marimo the launched process must import: a direct
+      reference to the wheel named by `MARIMO_RUNTIME_WHEEL` when set,
+      `marimo[<extras>]==<version>` otherwise, or `-e <path>` when marimo
+      runs from a development checkout. Every overlay has one; see below.
     * `command` holds requirements of the marimo *command* being launched,
       such as `nbformat` for an ipynb export or `playwright` for a
       thumbnail. These exist only because such a command runs inside the
@@ -108,19 +111,74 @@ def runtime_overlay(
 ) -> RuntimeOverlay:
     """The overlay binding a launch to the running marimo.
 
-    Resolves the runtime requirement from this process: the installed
-    version, or an editable install of the checkout when marimo is running
-    from source, so that a contributor's sandbox runs their working tree
-    rather than the last release. `extras` are marimo's own extras, such as
-    `lsp` for a process that hosts the language server.
+    Resolves the runtime requirement in precedence order: a direct
+    reference to the wheel named by `MARIMO_RUNTIME_WHEEL` when set (for a
+    distribution that installs marimo from a wheel rather than PyPI, where
+    a same-version PyPI marimo would otherwise satisfy `marimo==<version>`
+    without ever installing the wheel); the installed version; or an
+    editable install of the checkout when marimo is running from source,
+    so that a contributor's sandbox runs their working tree rather than
+    the last release. `extras` are marimo's own extras, such as `lsp` for
+    a process that hosts the language server.
 
     Requirements are never written to the notebook's manifest; see
     `RuntimeOverlay`.
     """
     suffix = f"[{','.join(extras)}]" if extras else ""
-    if is_editable("marimo"):
+    wheel_env = os.environ.get("MARIMO_RUNTIME_WHEEL")
+    if wheel_env:
+        wheel = _runtime_wheel(wheel_env)
+        runtime = f"marimo{suffix} @ {wheel.resolve().as_uri()}"
+    elif is_editable("marimo"):
         LOGGER.info("Using editable of marimo for sandbox")
         runtime = f"-e {marimo_dir()}{suffix}"
     else:
         runtime = f"marimo{suffix}=={__version__}"
     return RuntimeOverlay(runtime=runtime, command=tuple(command))
+
+
+def _runtime_wheel(value: str) -> Path:
+    """Validate `MARIMO_RUNTIME_WHEEL` and return the wheel it names.
+
+    `value` is either a wheel file or a directory containing exactly one
+    `marimo-*.whl`. Either way, the wheel's filename must name `marimo`
+    at this process's version -- the overlay always binds the launched
+    process to the running marimo; see `RuntimeOverlay`.
+    """
+    from packaging.utils import InvalidWheelFilename, parse_wheel_filename
+    from packaging.version import Version
+
+    path = Path(value)
+    if path.is_dir():
+        matches = sorted(path.glob("marimo-*.whl"))
+        if len(matches) != 1:
+            raise EnvironmentManagerError(
+                f"MARIMO_RUNTIME_WHEEL={value} must contain exactly one "
+                f"marimo-*.whl wheel; found {len(matches)}"
+            )
+        wheel = matches[0]
+    elif path.is_file():
+        wheel = path
+    else:
+        raise EnvironmentManagerError(
+            f"MARIMO_RUNTIME_WHEEL={value} does not exist"
+        )
+
+    try:
+        name, version, _build, _tags = parse_wheel_filename(wheel.name)
+    except InvalidWheelFilename as error:
+        raise EnvironmentManagerError(
+            f"MARIMO_RUNTIME_WHEEL={value} is not a valid wheel filename: "
+            f"{error}"
+        ) from error
+    if name != "marimo":
+        raise EnvironmentManagerError(
+            f"MARIMO_RUNTIME_WHEEL={value} must be a marimo wheel, found "
+            f"{name!r}"
+        )
+    if version != Version(__version__):
+        raise EnvironmentManagerError(
+            f"MARIMO_RUNTIME_WHEEL={value} is marimo {version}, but this "
+            f"process is {__version__}"
+        )
+    return wheel

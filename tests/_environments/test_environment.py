@@ -349,3 +349,111 @@ def test_runtime_overlay_preserves_extras(
         expected,
         "idna",
     )
+
+
+@pytest.mark.parametrize("features", [[], ["lsp"]])
+def test_runtime_wheel_env_var_file_form(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, features: list[str]
+) -> None:
+    from marimo._environments import overlay
+    from marimo._version import __version__
+
+    wheel = tmp_path / f"marimo-{__version__}-py3-none-any.whl"
+    wheel.write_bytes(b"")
+    monkeypatch.setenv("MARIMO_RUNTIME_WHEEL", str(wheel))
+
+    extras = "[lsp]" if features else ""
+    expected = f"marimo{extras} @ {wheel.resolve().as_uri()}"
+    assert overlay.runtime_overlay(features).requirements == (expected,)
+
+
+def test_runtime_wheel_env_var_directory_form_picks_the_matching_wheel(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from marimo._environments import overlay
+    from marimo._version import __version__
+
+    wheel = tmp_path / f"marimo-{__version__}-py3-none-any.whl"
+    wheel.write_bytes(b"")
+    (tmp_path / "README.txt").write_text("not a wheel")
+    monkeypatch.setenv("MARIMO_RUNTIME_WHEEL", str(tmp_path))
+
+    expected = f"marimo @ {wheel.resolve().as_uri()}"
+    assert overlay.runtime_overlay().requirements == (expected,)
+
+
+def test_runtime_wheel_env_var_wins_over_editable(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from marimo._environments import overlay
+    from marimo._version import __version__
+
+    monkeypatch.setattr(overlay, "is_editable", lambda _: True)
+    wheel = tmp_path / f"marimo-{__version__}-py3-none-any.whl"
+    wheel.write_bytes(b"")
+    monkeypatch.setenv("MARIMO_RUNTIME_WHEEL", str(wheel))
+
+    expected = f"marimo @ {wheel.resolve().as_uri()}"
+    assert overlay.runtime_overlay().requirements == (expected,)
+
+
+def test_runtime_wheel_missing_path_raises(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from marimo._environments import overlay
+    from marimo._environments.errors import EnvironmentManagerError
+
+    monkeypatch.setenv("MARIMO_RUNTIME_WHEEL", str(tmp_path / "missing"))
+    with pytest.raises(EnvironmentManagerError, match="MARIMO_RUNTIME_WHEEL"):
+        overlay.runtime_overlay()
+
+
+@pytest.mark.parametrize("wheel_count", [0, 2])
+def test_runtime_wheel_ambiguous_directory_raises(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, wheel_count: int
+) -> None:
+    from marimo._environments import overlay
+    from marimo._environments.errors import EnvironmentManagerError
+
+    for index in range(wheel_count):
+        (tmp_path / f"marimo-{index}-py3-none-any.whl").write_bytes(b"")
+    monkeypatch.setenv("MARIMO_RUNTIME_WHEEL", str(tmp_path))
+
+    with pytest.raises(EnvironmentManagerError, match="MARIMO_RUNTIME_WHEEL"):
+        overlay.runtime_overlay()
+
+
+def test_runtime_wheel_version_mismatch_raises(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from marimo._environments import overlay
+    from marimo._environments.errors import EnvironmentManagerError
+
+    wheel = tmp_path / "marimo-0.0.1-py3-none-any.whl"
+    wheel.write_bytes(b"")
+    monkeypatch.setenv("MARIMO_RUNTIME_WHEEL", str(wheel))
+
+    with pytest.raises(EnvironmentManagerError, match="MARIMO_RUNTIME_WHEEL"):
+        overlay.runtime_overlay()
+
+
+def test_runtime_wheel_name_mismatch_raises(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from marimo._environments import overlay
+    from marimo._environments.errors import EnvironmentManagerError
+    from marimo._version import __version__
+
+    wheel = tmp_path / f"numpy-{__version__}-py3-none-any.whl"
+    wheel.write_bytes(b"")
+    monkeypatch.setenv("MARIMO_RUNTIME_WHEEL", str(wheel))
+
+    with pytest.raises(EnvironmentManagerError, match="MARIMO_RUNTIME_WHEEL"):
+        overlay.runtime_overlay()
+
+
+def test_with_args_keeps_a_direct_wheel_reference_unchanged() -> None:
+    requirement = (
+        "marimo @ file:///opt/marimo/dist/marimo-0.25.0-py3-none-any.whl"
+    )
+    assert environment._with_args((requirement,)) == ["--with", requirement]
