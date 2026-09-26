@@ -129,15 +129,9 @@ async def sync_notebook_async(
 
 def _uv_launcher(backend: Backend) -> tuple[str, ...]:
     if backend == "pixi":
-        from marimo._environments.pixi import UV_OVERLAY_SPEC, require_pixi_bin
+        from marimo._environments.pixi import overlay_uv_launcher
 
-        return (
-            require_pixi_bin(),
-            "exec",
-            "--spec",
-            UV_OVERLAY_SPEC,
-            "uv",
-        )
+        return overlay_uv_launcher()
     from marimo._environments.uv import require_uv_bin
 
     return (require_uv_bin(),)

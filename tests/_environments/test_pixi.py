@@ -404,6 +404,93 @@ def test_launch_activates_the_conda_prefix(
     assert plan.start_new_session
 
 
+def test_overlay_uv_launcher_unset_fetches_uv_through_pixi_exec(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("MARIMO_PIXI_UV", raising=False)
+    monkeypatch.setattr(pixi, "find_pixi_bin", lambda: "/stub/pixi")
+
+    assert pixi.overlay_uv_launcher() == (
+        "/stub/pixi",
+        "exec",
+        "--spec",
+        pixi.UV_OVERLAY_SPEC,
+        "uv",
+    )
+
+
+@posix_only
+def test_overlay_uv_launcher_uses_the_stub(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    stub = tmp_path / "uv"
+    stub.write_text("#!/bin/sh\necho stub\n")
+    stub.chmod(stub.stat().st_mode | stat.S_IEXEC)
+    monkeypatch.setenv("MARIMO_PIXI_UV", str(stub))
+
+    assert pixi.overlay_uv_launcher() == (str(stub),)
+
+
+def test_overlay_uv_launcher_rejects_a_missing_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("MARIMO_PIXI_UV", str(tmp_path / "missing"))
+
+    with pytest.raises(pixi.PixiError, match="MARIMO_PIXI_UV"):
+        pixi.overlay_uv_launcher()
+
+
+@posix_only
+def test_overlay_uv_launcher_rejects_a_non_executable_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    stub = tmp_path / "uv"
+    stub.write_text("not executable\n")
+    monkeypatch.setenv("MARIMO_PIXI_UV", str(stub))
+
+    with pytest.raises(pixi.PixiError, match="MARIMO_PIXI_UV"):
+        pixi.overlay_uv_launcher()
+
+
+def test_launch_uses_overlay_uv_launcher(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`launch`'s argv is prefixed by `overlay_uv_launcher`, not a
+    hardcoded `pixi exec`."""
+    from marimo._environments.environment import Environment
+
+    monkeypatch.setattr(pixi, "overlay_uv_launcher", lambda: ("/stub/uv",))
+    root = str(tmp_path / "prefix")
+    handle = Environment(
+        python=os.path.join(root, "bin", "python"),
+        root=root,
+        action="updated",
+    )
+
+    plan = pixi.launch(
+        handle,
+        ["-m", "marimo"],
+        overlay=RuntimeOverlay(runtime="marimo==1.0"),
+    )
+
+    assert plan.argv[0] == "/stub/uv"
+    assert plan.argv[1] == "run"
+
+
+@posix_only
+def test_backends_uv_launcher_pixi_uses_the_stub(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from marimo._environments import backends
+
+    stub = tmp_path / "uv"
+    stub.write_text("#!/bin/sh\necho stub\n")
+    stub.chmod(stub.stat().st_mode | stat.S_IEXEC)
+    monkeypatch.setenv("MARIMO_PIXI_UV", str(stub))
+
+    assert backends._uv_launcher("pixi") == (str(stub),)
+
+
 def test_fallback_plan_reflects_this_interpreter() -> None:
     """With no manifest there is nothing to sandbox; the plan runs this
     interpreter, and inherited activation state must describe it rather
@@ -621,6 +708,99 @@ def test_overlay_chains_the_conda_prefix(
         *pixi._activation_path_entries(environment.root),
     ]
     assert identity["path"][: len(expected_paths)] == expected_paths
+
+
+@pytest.mark.network
+@pytest.mark.skipif(
+    not pixi.find_pixi_bin(), reason="pixi is required for this test"
+)
+def test_launch_overlays_a_runtime_wheel_through_a_real_uv(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """MARIMO_RUNTIME_WHEEL + MARIMO_PIXI_UV together: a real uv, invoked
+    directly rather than through `pixi exec`, installs the stub wheel as
+    the launched process's marimo."""
+    import json
+    import shutil
+    import subprocess
+    import zipfile
+
+    from packaging.version import Version
+
+    from marimo._environments.overlay import runtime_overlay
+    from marimo._version import __version__
+
+    uv_bin = shutil.which("uv")
+    if uv_bin is None:
+        pytest.skip("uv is required for this test")
+    version_output = subprocess.run(
+        [uv_bin, "--version"], capture_output=True, text=True, check=True
+    ).stdout
+    uv_version = version_output.strip().removeprefix("uv ").split(" ")[0]
+    if Version(uv_version) < Version("0.12"):
+        pytest.skip("uv >= 0.12 is required for this test")
+
+    wheel_path = tmp_path / f"marimo-{__version__}-py3-none-any.whl"
+    dist_info = f"marimo-{__version__}.dist-info"
+    with zipfile.ZipFile(wheel_path, "w") as wheel:
+        wheel.writestr("marimo/__init__.py", "SENTINEL = 'stub-marimo'\n")
+        wheel.writestr(
+            f"{dist_info}/METADATA",
+            f"Metadata-Version: 2.1\nName: marimo\nVersion: {__version__}\n",
+        )
+        wheel.writestr(
+            f"{dist_info}/WHEEL",
+            "Wheel-Version: 1.0\n"
+            "Generator: marimo-test\n"
+            "Root-Is-Purelib: true\n"
+            "Tag: py3-none-any\n",
+        )
+        wheel.writestr(f"{dist_info}/RECORD", "")
+
+    notebook = tmp_path / "notebook.py"
+    notebook.write_text(
+        "# /// script\n"
+        "# dependencies = []\n"
+        "#\n"
+        "# [tool.pixi.workspace]\n"
+        '# channels = ["conda-forge"]\n'
+        "# ///\n"
+    )
+    environment = pixi.sync(str(notebook), cwd=str(tmp_path))
+
+    monkeypatch.setenv("MARIMO_RUNTIME_WHEEL", str(wheel_path))
+    monkeypatch.setenv("MARIMO_PIXI_UV", uv_bin)
+    overlay = runtime_overlay()
+
+    code = (
+        "import marimo\n"
+        "from importlib.metadata import Distribution\n"
+        "print(marimo.SENTINEL)\n"
+        "print(Distribution.from_name('marimo')"
+        ".read_text('direct_url.json'))\n"
+    )
+    plan = pixi.launch(
+        environment,
+        ["-c", code],
+        overlay=overlay,
+    )
+
+    assert plan.argv[0] == uv_bin
+    completed = subprocess.run(
+        list(plan.argv),
+        env=plan.env,
+        # Not the repo root: it has its own marimo/ directory, which
+        # `python -c`'s implicit cwd-first sys.path entry would import
+        # instead of the overlay's.
+        cwd=str(tmp_path),
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode == 0, completed.stderr
+    lines = completed.stdout.splitlines()
+    assert lines[0] == "stub-marimo"
+    direct_url = json.loads(lines[1])
+    assert direct_url["url"] == wheel_path.resolve().as_uri()
 
 
 def test_command_env_drops_enclosing_activation(

@@ -382,6 +382,21 @@ def ensure_marimo(
 UV_OVERLAY_SPEC = "uv>=0.12"
 
 
+def overlay_uv_launcher() -> tuple[str, ...]:
+    """The uv invocation a launch prefixes onto its overlay command.
+
+    `MARIMO_PIXI_UV` names a uv executable to invoke directly, opting out
+    of `pixi exec`'s own resolution of `UV_OVERLAY_SPEC`; unset keeps
+    fetching uv through pixi.
+    """
+    override = os.environ.get("MARIMO_PIXI_UV")
+    if not override:
+        return (require_pixi_bin(), "exec", "--spec", UV_OVERLAY_SPEC, "uv")
+    if not os.path.isfile(override) or not os.access(override, os.X_OK):
+        raise PixiError(f"MARIMO_PIXI_UV={override} is not an executable file")
+    return (override,)
+
+
 async def ensure_marimo_async(
     path: str,
     *,
@@ -480,11 +495,7 @@ def launch(
     env["PATH"] = os.pathsep.join(path_entries)
     return ProcessPlan(
         argv=(
-            require_pixi_bin(),
-            "exec",
-            "--spec",
-            UV_OVERLAY_SPEC,
-            "uv",
+            *overlay_uv_launcher(),
             "run",
             "--no-project",
             "--python",
