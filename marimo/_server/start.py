@@ -13,6 +13,7 @@ from marimo._cli.print import echo
 from marimo._config.config import PartialMarimoConfig
 from marimo._config.manager import get_default_config_manager
 from marimo._config.settings import GLOBAL_SETTINGS
+from marimo._environments.overlay import runtime_overlay
 from marimo._environments.sandbox import Backend
 from marimo._mcp.setup import McpType, setup_mcp_server
 from marimo._messaging.notification import StartupLogsNotification
@@ -285,6 +286,9 @@ def start(
     if sandbox is not None:
         os.environ["MARIMO_SANDBOX_BACKEND"] = sandbox
         GLOBAL_SETTINGS.SANDBOX_BACKEND = sandbox
+        # Resolve now so a bad MARIMO_RUNTIME_WHEEL fails the server at
+        # boot instead of at the first kernel launch.
+        runtime_overlay()
         if mode == SessionMode.EDIT:
             os.environ["MARIMO_MANAGE_SCRIPT_METADATA"] = "true"
             GLOBAL_SETTINGS.MANAGE_SCRIPT_METADATA = True
