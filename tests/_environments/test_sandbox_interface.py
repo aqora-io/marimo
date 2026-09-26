@@ -648,6 +648,150 @@ def test_launch_async_never_retries_missing_script_metadata(
     assert sync_async.await_count == 1
 
 
+@pytest.mark.parametrize("method", ["launch", "launch_async"])
+def test_prepare_pins_requires_python_on_an_existing_header_when_configured(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, method: str
+) -> None:
+    monkeypatch.setenv("MARIMO_DEFAULT_REQUIRES_PYTHON", "==3.12.*")
+    notebook = tmp_path / "notebook.py"
+    notebook.write_text("# /// script\n# dependencies = []\n# ///\n")
+    adapter = FakeBackend(tmp_path / "environment")
+    sandbox = NotebookSandbox(str(notebook), "uv", adapter=adapter)
+
+    _launch(sandbox, method, prepare=True)
+
+    assert '# requires-python = "==3.12.*"' in notebook.read_text()
+
+
+@pytest.mark.parametrize("method", ["launch", "launch_async"])
+def test_prepare_leaves_an_existing_requires_python_untouched(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, method: str
+) -> None:
+    monkeypatch.setenv("MARIMO_DEFAULT_REQUIRES_PYTHON", "==3.12.*")
+    notebook = tmp_path / "notebook.py"
+    original = (
+        '# /// script\n# requires-python = ">=3.10"\n'
+        "# dependencies = []\n# ///\n"
+    )
+    notebook.write_text(original)
+    adapter = FakeBackend(tmp_path / "environment")
+    sandbox = NotebookSandbox(str(notebook), "uv", adapter=adapter)
+
+    _launch(sandbox, method, prepare=True)
+
+    assert notebook.read_text() == original
+
+
+@pytest.mark.parametrize("method", ["launch", "launch_async"])
+@pytest.mark.parametrize(
+    "table",
+    ["tool.pixi.dependencies", "tool.pixi.target.linux-64.dependencies"],
+    ids=["every-platform", "one-platform"],
+)
+def test_prepare_leaves_requires_python_out_next_to_a_pixi_python_pin(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, method: str, table: str
+) -> None:
+    """pixi's own Python pin wins over requires-python, and marimo checks
+    requires-python against the running kernel on every package change:
+    pinning both would ask for a restart that never helps."""
+    monkeypatch.setenv("MARIMO_DEFAULT_REQUIRES_PYTHON", "==3.12.*")
+    notebook = tmp_path / "notebook.py"
+    original = (
+        "# /// script\n# dependencies = []\n#\n"
+        f'# [{table}]\n# python = "3.11.*"\n# ///\n'
+    )
+    notebook.write_text(original)
+    adapter = FakeBackend(tmp_path / "environment")
+    adapter.name = "pixi"  # type: ignore[misc]
+    sandbox = NotebookSandbox(str(notebook), "pixi", adapter=adapter)
+
+    _launch(sandbox, method, prepare=True)
+
+    assert notebook.read_text() == original
+
+
+@pytest.mark.parametrize("method", ["launch", "launch_async"])
+def test_prepare_pins_requires_python_under_uv_despite_a_pixi_python_pin(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, method: str
+) -> None:
+    """uv ignores [tool.pixi], so requires-python is the only Python pin a
+    uv environment gets."""
+    monkeypatch.setenv("MARIMO_DEFAULT_REQUIRES_PYTHON", "==3.12.*")
+    notebook = tmp_path / "notebook.py"
+    notebook.write_text(
+        "# /// script\n# dependencies = []\n#\n"
+        '# [tool.pixi.dependencies]\n# python = "3.11.*"\n# ///\n'
+    )
+    adapter = FakeBackend(tmp_path / "environment")
+    sandbox = NotebookSandbox(str(notebook), "uv", adapter=adapter)
+
+    _launch(sandbox, method, prepare=True)
+
+    project = script_metadata.loads(notebook.read_text())
+    assert project is not None
+    assert project["requires-python"] == "==3.12.*"
+    assert project["tool"]["pixi"]["dependencies"]["python"] == "3.11.*"
+
+
+@pytest.mark.parametrize("method", ["launch", "launch_async"])
+def test_prepare_unset_leaves_an_existing_header_unchanged(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, method: str
+) -> None:
+    monkeypatch.delenv("MARIMO_DEFAULT_REQUIRES_PYTHON", raising=False)
+    notebook = tmp_path / "notebook.py"
+    original = "# /// script\n# dependencies = []\n# ///\n"
+    notebook.write_text(original)
+    adapter = FakeBackend(tmp_path / "environment")
+    sandbox = NotebookSandbox(str(notebook), "uv", adapter=adapter)
+
+    _launch(sandbox, method, prepare=True)
+
+    assert notebook.read_text() == original
+
+
+@pytest.mark.parametrize("method", ["launch", "launch_async"])
+def test_unprepared_launch_never_pins_requires_python(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, method: str
+) -> None:
+    monkeypatch.setenv("MARIMO_DEFAULT_REQUIRES_PYTHON", "==3.12.*")
+    notebook = tmp_path / "notebook.py"
+    original = "# /// script\n# dependencies = []\n# ///\n"
+    notebook.write_text(original)
+    adapter = FakeBackend(tmp_path / "environment")
+    sandbox = NotebookSandbox(str(notebook), "uv", adapter=adapter)
+
+    _launch(sandbox, method, prepare=False)
+
+    assert notebook.read_text() == original
+
+
+@pytest.mark.parametrize("method", ["launch", "launch_async"])
+@pytest.mark.parametrize("backend", ["uv", "pixi"])
+@pytest.mark.parametrize(
+    "block", ["# dependencies = []", "# ..."], ids=["valid", "malformed"]
+)
+def test_prepare_leaves_script_blocks_in_markdown_cells_alone(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    method: str,
+    backend: str,
+    block: str,
+) -> None:
+    """A markdown notebook's manifest lives in its frontmatter, so a script
+    block in one of its cells is the user's code."""
+    monkeypatch.setenv("MARIMO_DEFAULT_REQUIRES_PYTHON", "==3.12.*")
+    notebook = tmp_path / "notebook.md"
+    cell = f"```python {{.marimo}}\n# /// script\n{block}\n# ///\nimport json\n```\n"
+    notebook.write_text(f"---\ntitle: Demo\n---\n\n{cell}")
+    adapter = FakeBackend(tmp_path / "environment")
+    adapter.name = backend  # type: ignore[misc]
+    sandbox = NotebookSandbox(str(notebook), backend, adapter=adapter)
+
+    _launch(sandbox, method, prepare=True)
+
+    assert notebook.read_text().endswith(cell)
+
+
 class OverlapBackend(FakeBackend):
     """Counts launches between the start of prepare and the end of sync."""
 
