@@ -9,10 +9,12 @@ operation and are cleaned by `script_metadata`.
 
 from __future__ import annotations
 
+import asyncio
 import re
 import shlex
 import subprocess
 import tempfile
+import weakref
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -21,6 +23,7 @@ from typing import TYPE_CHECKING, Literal, Protocol
 from marimo._environments import script_metadata
 from marimo._environments.errors import (
     EnvironmentManagerError,
+    MissingScriptMetadataError,
     SandboxRestartRequired,
 )
 from marimo._environments.process import run_command
@@ -39,6 +42,12 @@ LogCallback = Callable[[str], None]
 ENVIRONMENT_PYTHON = "MARIMO_SANDBOX_ENVIRONMENT_PYTHON"
 ENVIRONMENT_ROOT = "MARIMO_SANDBOX_ENVIRONMENT_ROOT"
 MANIFEST_SOURCE = "MARIMO_SANDBOX_MANIFEST_SOURCE"
+
+# Sessions of one notebook, such as its app's viewers, launch concurrently;
+# each would otherwise prepare and synchronize the same environment at once.
+_LAUNCH_LOCKS: weakref.WeakValueDictionary[str, asyncio.Lock] = (
+    weakref.WeakValueDictionary()
+)
 
 
 @dataclass(frozen=True)
@@ -304,11 +313,21 @@ class NotebookSandbox:
         base_env: Mapping[str, str] | None = None,
         python_override: str | None = None,
         on_output: LogCallback | None = None,
+        prepare: bool = True,
     ) -> ProcessPlan:
-        """Synchronize and plan `python <args...>` in the Environment."""
+        """Synchronize and plan `python <args...>` in the Environment.
+
+        `prepare` writes a manifest declaring marimo into the notebook
+        first. Without it the notebook is only read: its own manifest is
+        synchronized, and a notebook without one raises
+        `MissingScriptMetadataError`.
+        """
+        if not prepare:
+            self._require_metadata_block()
         self._adapter.ensure_available()
-        script_metadata.ensure_metadata_block(self._source)
-        self._adapter.prepare_source(self._source)
+        if prepare:
+            script_metadata.ensure_metadata_block(self._source)
+            self._adapter.prepare_source(self._source)
         environment = self._sync(
             python_override=python_override, on_output=on_output
         )
@@ -322,17 +341,28 @@ class NotebookSandbox:
         base_env: Mapping[str, str] | None = None,
         python_override: str | None = None,
         on_output: LogCallback | None = None,
+        prepare: bool = True,
     ) -> ProcessPlan:
-        """Prepare cancellably; publish the environment only after success."""
+        """Prepare cancellably; publish the environment only after success.
+
+        `prepare` is as for `launch`.
+        """
+        if not prepare:
+            self._require_metadata_block()
         await self._adapter.ensure_available_async()
-        script_metadata.ensure_metadata_block(self._source)
-        await self._adapter.prepare_source_async(self._source)
-        async with script_metadata.materialized_for_environment_async(
-            self._source
-        ) as target:
-            environment = await self._adapter.sync_async(
-                target, python_override=python_override, on_output=on_output
-            )
+        lock = _LAUNCH_LOCKS.setdefault(self._source, asyncio.Lock())
+        async with lock:
+            if prepare:
+                script_metadata.ensure_metadata_block(self._source)
+                await self._adapter.prepare_source_async(self._source)
+            async with script_metadata.materialized_for_environment_async(
+                self._source
+            ) as target:
+                environment = await self._adapter.sync_async(
+                    target,
+                    python_override=python_override,
+                    on_output=on_output,
+                )
         self._environment = environment
         self._environment_source = self._source
         return self._launch_plan(environment, args, overlay, base_env)
@@ -360,6 +390,13 @@ class NotebookSandbox:
             )
         self._environment = environment
         self._environment_source = self._source
+
+    def _require_metadata_block(self) -> None:
+        """Refuse, before any backend call, a notebook without a manifest."""
+        if not script_metadata.has_metadata_block(self._source):
+            raise MissingScriptMetadataError(
+                f"No script metadata found in {self._source}"
+            )
 
     def _launch_plan(
         self,

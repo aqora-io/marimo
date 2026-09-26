@@ -7,11 +7,17 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from marimo._environments.errors import MissingScriptMetadataError
 from marimo._session.managers.ipc import construct_kernel_env
+from marimo._session.model import SessionMode
+
+if TYPE_CHECKING:
+    from marimo._session.managers.ipc import IPCKernelManagerImpl
 
 
 @pytest.mark.requires("zmq")
@@ -610,3 +616,159 @@ async def test_startup_owns_kernel_process_and_pipes(
         manager.queue_manager.close_queues()
         server.close()
         await server.wait_closed()
+
+
+# Stands in for the kernel: completes the startup handshake, then idles.
+_KERNEL = (
+    "import os, sys, time; sys.stdin.read(); "
+    "print('KERNEL_READY', flush=True); "
+    "print(f'KERNEL_INFO {os.getpid()} {sys.executable}', flush=True); "
+    "time.sleep(60)"
+)
+
+
+def _sandboxed_manager(
+    mode: SessionMode,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    launch_error: Exception | None = None,
+) -> tuple[IPCKernelManagerImpl, MagicMock, list[tuple[list[str], dict]]]:
+    """A manager whose notebook sandbox and kernel are stand-ins.
+
+    The server environment carries the sandbox identity a sandboxed
+    server can export, so tests see what each kernel launch keeps.
+    Returns the manager, its sandbox, and each kernel launch's argv and
+    environment.
+    """
+    from marimo._ast.app_config import _AppConfig
+    from marimo._config.manager import get_default_config_manager
+    from marimo._config.settings import GLOBAL_SETTINGS
+    from marimo._environments.environment import ProcessPlan
+    from marimo._ipc import QueueManager
+    from marimo._runtime.commands import AppMetadata
+    from marimo._session.managers.ipc import (
+        IPCKernelManagerImpl,
+        IPCQueueManagerImpl,
+    )
+
+    monkeypatch.setattr(GLOBAL_SETTINGS, "SANDBOX_BACKEND", "pixi")
+    monkeypatch.setenv("MARIMO_SANDBOX_BACKEND", "pixi")
+    monkeypatch.setenv("MARIMO_SANDBOX_MODE", "multi")
+    monkeypatch.setenv("MARIMO_MANAGE_SCRIPT_METADATA", "true")
+    sandbox = MagicMock()
+    sandbox.launch_async = AsyncMock(
+        return_value=ProcessPlan(
+            argv=(sys.executable, "-c", _KERNEL),
+            env=os.environ.copy(),
+            start_new_session=True,
+        ),
+        side_effect=launch_error,
+    )
+    monkeypatch.setattr(
+        "marimo._environments.sandbox.NotebookSandbox", lambda *_: sandbox
+    )
+    popen = subprocess.Popen
+    launches: list[tuple[list[str], dict]] = []
+
+    def launch(cmd: Any, **kwargs: Any) -> subprocess.Popen[bytes]:
+        # Windows cleanup also uses Popen for taskkill; only replace the kernel.
+        if cmd[-2:] in (["-c", _KERNEL], ["-m", "marimo._ipc.launch_kernel"]):
+            launches.append((cmd, kwargs["env"]))
+            cmd = [sys.executable, "-c", _KERNEL]
+        return popen(cmd, **kwargs)
+
+    monkeypatch.setattr(
+        "marimo._session.managers.ipc.subprocess.Popen", launch
+    )
+    queues, connection_info = QueueManager.create()
+    manager = IPCKernelManagerImpl(
+        sandbox=True,
+        queue_manager=IPCQueueManagerImpl.from_ipc(queues),
+        connection_info=connection_info,
+        mode=mode,
+        configs={},
+        app_metadata=AppMetadata(
+            query_params={},
+            filename=None,
+            cli_args={},
+            argv=None,
+            app_config=_AppConfig(),
+        ),
+        config_manager=get_default_config_manager(current_path=None),
+    )
+    return manager, sandbox, launches
+
+
+@pytest.mark.requires("zmq")
+@pytest.mark.parametrize("mode", [SessionMode.EDIT, SessionMode.RUN])
+async def test_only_edit_sessions_prepare_and_manage_the_notebook(
+    mode: SessionMode, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    manager, sandbox, launches = _sandboxed_manager(mode, monkeypatch)
+    edit = mode == SessionMode.EDIT
+    try:
+        await asyncio.wait_for(manager.start_kernel(), 30)
+
+        assert sandbox.launch_async.call_args.kwargs["prepare"] is edit
+        ((cmd, env),) = launches
+        assert cmd == [sys.executable, "-c", _KERNEL]
+        assert env["MARIMO_SANDBOX_MODE"] == "multi"
+        assert env["MARIMO_SANDBOX_BACKEND"] == "pixi"
+        assert env.get("MARIMO_MANAGE_SCRIPT_METADATA") == (
+            "true" if edit else None
+        )
+        assert manager.notebook_sandbox is sandbox
+    finally:
+        await manager._cleanup_failed_start()
+        manager.queue_manager.close_queues()
+
+
+@pytest.mark.requires("zmq")
+async def test_run_session_without_manifest_runs_on_server_python(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manager, sandbox, launches = _sandboxed_manager(
+        SessionMode.RUN,
+        monkeypatch,
+        launch_error=MissingScriptMetadataError("No script metadata"),
+    )
+    try:
+        await asyncio.wait_for(manager.start_kernel(), 30)
+
+        ((cmd, env),) = launches
+        assert cmd == [sys.executable, "-m", "marimo._ipc.launch_kernel"]
+        assert "MARIMO_SANDBOX_MODE" not in env
+        assert "MARIMO_SANDBOX_BACKEND" not in env
+        assert "MARIMO_MANAGE_SCRIPT_METADATA" not in env
+        assert manager.notebook_sandbox is None
+        assert manager.venv_python == sys.executable
+        sandbox.close.assert_called_once()
+        # Launched directly, the kernel shares the server's process group
+        # until it calls setsid: closing must not signal it by kernel pid.
+        assert manager._kernel_pid is None
+    finally:
+        await manager._cleanup_failed_start()
+        manager.queue_manager.close_queues()
+
+
+@pytest.mark.requires("zmq")
+async def test_edit_session_without_manifest_fails_to_start(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from marimo._session.managers.ipc import KernelStartupError
+
+    manager, sandbox, launches = _sandboxed_manager(
+        SessionMode.EDIT,
+        monkeypatch,
+        launch_error=MissingScriptMetadataError("No script metadata"),
+    )
+    try:
+        with pytest.raises(KernelStartupError, match="No script metadata"):
+            await asyncio.wait_for(manager.start_kernel(), 30)
+
+        assert launches == []
+        assert manager.notebook_sandbox is None
+        sandbox.close.assert_called_once()
+    finally:
+        await manager._cleanup_failed_start()
+        manager.queue_manager.close_queues()

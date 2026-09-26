@@ -266,6 +266,17 @@ def ensure_metadata_block(path: str) -> None:
         f.write(script)
 
 
+def has_metadata_block(path: str) -> bool:
+    """Whether a notebook declares a dependency manifest.
+
+    Reads the notebook in place, without materializing a carrier.
+    """
+    if path.endswith((".md", ".qmd")):
+        return loads(_read_frontmatter(path).header) is not None
+    with open(path, encoding="utf-8") as f:
+        return loads(f.read()) is not None
+
+
 def default_requires_python() -> str:
     """The `requires-python` floor new metadata is stamped with.
 

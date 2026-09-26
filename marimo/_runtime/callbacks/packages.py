@@ -19,6 +19,7 @@ from marimo._runtime.context.types import (
     ContextNotInitializedError,
     get_context,
 )
+from marimo._runtime.context.utils import get_mode
 from marimo._runtime.packages.import_error_extractors import (
     extract_missing_module_from_cause_chain,
     try_extract_packages_from_import_error_message,
@@ -34,6 +35,7 @@ from marimo._runtime.packages.utils import (
     is_python_isolated,
 )
 from marimo._runtime.runner import hook_context
+from marimo._session.model import SessionMode
 
 if TYPE_CHECKING:
     from marimo._runtime.request_router import RequestRouter
@@ -390,6 +392,11 @@ class PackagesCallbacks:
             GLOBAL_SETTINGS.MANAGE_SCRIPT_METADATA is True
             and self._kernel.app_metadata.filename is not None
             and self.package_manager is not None
+            # App viewers never write the notebook they are served. The
+            # kernel's own mode also holds while it is being constructed,
+            # before get_mode() can report it.
+            and self._kernel.session_mode == SessionMode.EDIT
+            and get_mode() != "run"
         )
 
     def update_script_metadata(

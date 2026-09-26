@@ -417,13 +417,19 @@ class IPCKernelManagerImpl(KernelManager):
                 # The session retains this Interface so rename and package API
                 # operations update the same Manifest binding and Environment.
                 from marimo._environments import backends
-                from marimo._environments.errors import EnvironmentManagerError
+                from marimo._environments.errors import (
+                    EnvironmentManagerError,
+                    MissingScriptMetadataError,
+                )
                 from marimo._environments.sandbox import NotebookSandbox
 
                 backend = backends.current_backend()
                 kernel_args_list = ["-m", "marimo._ipc.launch_kernel"]
                 overlay = runtime_overlay()
                 filename = self.app_metadata.filename
+                # Only the editor writes the notebook: a run session (an app
+                # viewer) synchronizes the environment its manifest describes.
+                edit = self.mode == SessionMode.EDIT
                 sandbox = NotebookSandbox(filename, backend)
                 try:
                     plan = await sandbox.launch_async(
@@ -433,7 +439,27 @@ class IPCKernelManagerImpl(KernelManager):
                         on_output=lambda line: operation.update(
                             {"environment": line}
                         ),
+                        prepare=edit,
                     )
+                except MissingScriptMetadataError as e:
+                    sandbox.close()
+                    if edit:
+                        raise KernelStartupError(
+                            f"Failed to build sandbox environment.\n\n{e}"
+                        ) from e
+                    # As for app hosts and exports, a notebook without a
+                    # manifest runs on the server's interpreter.
+                    plan = backends.launch_fallback(
+                        kernel_args_list, base_env=os.environ.copy()
+                    )
+                    self._venv_python = sys.executable
+                    plan.env.pop("MARIMO_SANDBOX_MODE", None)
+                    plan.env.pop("MARIMO_SANDBOX_BACKEND", None)
+                    plan.env.pop("MARIMO_MANAGE_SCRIPT_METADATA", None)
+                    # Launched directly, like a configured venv's kernel: it
+                    # shares the server's process group until it calls
+                    # setsid, so it must not be closed through its own pid.
+                    plan_launched = False
                 except EnvironmentManagerError as e:
                     sandbox.close()
                     raise KernelStartupError(
@@ -442,25 +468,30 @@ class IPCKernelManagerImpl(KernelManager):
                 except BaseException:
                     sandbox.close()
                     raise
-                handle = sandbox.environment
-                if handle is None:
-                    sandbox.close()
-                    raise KernelStartupError(
-                        "Failed to build sandbox environment: no Environment was returned"
+                else:
+                    handle = sandbox.environment
+                    if handle is None:
+                        sandbox.close()
+                        raise KernelStartupError(
+                            "Failed to build sandbox environment: no Environment was returned"
+                        )
+
+                    self._notebook_sandbox = sandbox
+                    self._venv_python = handle.python
+                    echo(
+                        f"Running kernel in script environment: {muted(handle.root)}",
+                        err=True,
                     )
 
-                self._notebook_sandbox = sandbox
-                self._venv_python = handle.python
-                echo(
-                    f"Running kernel in script environment: {muted(handle.root)}",
-                    err=True,
-                )
+                    if edit:
+                        plan.env["MARIMO_MANAGE_SCRIPT_METADATA"] = "true"
+                    else:
+                        plan.env.pop("MARIMO_MANAGE_SCRIPT_METADATA", None)
+                    plan.env["MARIMO_SANDBOX_MODE"] = "multi"
+                    plan.env["MARIMO_SANDBOX_BACKEND"] = backend
+                    plan_launched = True
 
-                plan_launched = True
                 env = plan.env
-                env["MARIMO_MANAGE_SCRIPT_METADATA"] = "true"
-                env["MARIMO_SANDBOX_MODE"] = "multi"
-                env["MARIMO_SANDBOX_BACKEND"] = backend
                 cmd = list(plan.argv)
 
         self._start_new_session = (
