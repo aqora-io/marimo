@@ -233,12 +233,20 @@ def ensure_metadata_block(path: str) -> None:
     """Create an empty dependency manifest when a notebook has none.
 
     The manifest module owns this structural write; environment managers
-    only edit the materialized script it gives them.
+    only edit the materialized script it gives them. `dependencies = []`
+    is preceded by `requires-python` when `MARIMO_DEFAULT_REQUIRES_PYTHON`
+    is set; see `default_requires_python`.
     """
+    override = os.environ.get("MARIMO_DEFAULT_REQUIRES_PYTHON")
+    toml_content = (
+        f'requires-python = "{override}"\ndependencies = []'
+        if override
+        else "dependencies = []"
+    )
     if path.endswith((".md", ".qmd")):
         front = _read_frontmatter(path)
         if loads(front.header) is None:
-            header = wrap_block("dependencies = []") + "\n" + front.header
+            header = wrap_block(toml_content) + "\n" + front.header
             _write_frontmatter(path, front, header)
         return
     if not path.endswith(".py"):
@@ -248,7 +256,7 @@ def ensure_metadata_block(path: str) -> None:
     if loads(script) is not None:
         return
 
-    block = wrap_block("dependencies = []") + "\n"
+    block = wrap_block(toml_content) + "\n"
     if script.startswith("#!"):
         shebang, _, rest = script.partition("\n")
         script = shebang + "\n" + block + rest
@@ -258,12 +266,25 @@ def ensure_metadata_block(path: str) -> None:
         f.write(script)
 
 
+def default_requires_python() -> str:
+    """The `requires-python` floor new metadata is stamped with.
+
+    `MARIMO_DEFAULT_REQUIRES_PYTHON` overrides the running interpreter's
+    own version, e.g. so a server newer than the Python versions its
+    sandboxes have cached does not default new notebooks onto it.
+    """
+    override = os.environ.get("MARIMO_DEFAULT_REQUIRES_PYTHON")
+    if override:
+        return override
+    version_tuple = platform.python_version_tuple()
+    return f">={version_tuple[0]}.{version_tuple[1]}"
+
+
 def with_python_version_requirement(project: dict[str, Any]) -> dict[str, Any]:
     # TODO(akshayka): consider locking the Python version for greater
     # reproducibility, instead of returning a lowerbound
     project = project.copy()
-    version_tuple = platform.python_version_tuple()
-    project["requires-python"] = f">={version_tuple[0]}.{version_tuple[1]}"
+    project["requires-python"] = default_requires_python()
     return project
 
 
@@ -391,10 +412,7 @@ def ensure_requires_python(path: str) -> None:
     if project is None or "requires-python" in project:
         return
 
-    version_tuple = platform.python_version_tuple()
-    requires_line = (
-        f'# requires-python = ">={version_tuple[0]}.{version_tuple[1]}"'
-    )
+    requires_line = f'# requires-python = "{default_requires_python()}"'
     new_content = re.sub(
         r"^# /// script$",
         f"# /// script\n{requires_line}",
