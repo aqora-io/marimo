@@ -331,6 +331,7 @@ class NotebookSandbox:
         self._adapter.ensure_available()
         if prepare:
             script_metadata.ensure_metadata_block(self._source)
+            _pin_default_python(self._source, self._adapter.name)
             self._adapter.prepare_source(self._source)
         environment = self._sync(
             python_override=python_override, on_output=on_output
@@ -369,6 +370,7 @@ class NotebookSandbox:
         async with lock:
             if prepare:
                 script_metadata.ensure_metadata_block(self._source)
+                _pin_default_python(self._source, self._adapter.name)
                 await self._adapter.prepare_source_async(self._source)
             try:
                 environment = await sync_once()
@@ -693,6 +695,47 @@ class NotebookSandbox:
         self._environment = environment
         self._environment_source = self._source
         return environment
+
+
+def _pin_default_python(path: str, backend: Backend) -> None:
+    """Pin MARIMO_DEFAULT_REQUIRES_PYTHON on an existing manifest, unless pixi
+    runs it and it pins Python in [tool.pixi]: pixi's pin wins over
+    requires-python in the solve, so pinning both would contradict the
+    running kernel on every package change (`_check_python_requirement`).
+    uv ignores [tool.pixi], so requires-python is its only pin. Python
+    notebooks only: a markdown notebook keeps its manifest in frontmatter,
+    and a script block in one of its cells is the user's code."""
+    import os
+
+    if not os.environ.get("MARIMO_DEFAULT_REQUIRES_PYTHON"):
+        return
+    if not path.endswith(".py"):
+        return
+    if backend == "pixi" and _pixi_pins_python(path):
+        return
+    script_metadata.ensure_requires_python(path)
+
+
+def _pixi_pins_python(path: str) -> bool:
+    """Whether the notebook's manifest pins Python in [tool.pixi], for every
+    platform or for one."""
+    with open(path, encoding="utf-8") as f:
+        project = script_metadata.loads(f.read()) or {}
+    tool = project.get("tool")
+    pixi = tool.get("pixi") if isinstance(tool, dict) else None
+    if not isinstance(pixi, dict):
+        return False
+    tables = [pixi.get("dependencies")]
+    targets = pixi.get("target")
+    if isinstance(targets, dict):
+        tables += [
+            target.get("dependencies")
+            for target in targets.values()
+            if isinstance(target, dict)
+        ]
+    return any(
+        isinstance(table, dict) and "python" in table for table in tables
+    )
 
 
 def _python_requirement(
