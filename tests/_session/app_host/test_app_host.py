@@ -398,6 +398,64 @@ class TestAppHostMultipleClients:
                 is not app_host._stream_receivers["session-2"]
             )
 
+    async def test_create_session_creates_the_host_off_the_event_loop(
+        self,
+    ) -> None:
+        """Creating a host syncs the notebook's environment and starts a
+        process: that must not stall the loop every other session runs on."""
+        import threading
+        from unittest.mock import Mock, patch
+
+        from marimo._config.config import DEFAULT_CONFIG
+        from marimo._session.app_host import AppHostContext
+        from marimo._session.app_host.host import AppHost
+        from marimo._session.model import SessionMode
+        from marimo._session.session import SessionImpl
+
+        app_host = AppHost("/tmp/test_app.py")
+        callers: list[int] = []
+
+        def get_or_create(file_path: str) -> AppHost:
+            del file_path
+            callers.append(threading.get_ident())
+            return app_host
+
+        pool = Mock()
+        pool.get_or_create.side_effect = get_or_create
+
+        with patch(
+            "marimo._session.managers.app_host."
+            "AppHostKernelManager.start_kernel"
+        ):
+            await SessionImpl.create(
+                startup=SessionStartup(),
+                initialization_id="/tmp/test_app.py",
+                session_consumer=Mock(),
+                mode=SessionMode.RUN,
+                app_metadata=Mock(),
+                app_file_manager=Mock(
+                    path="/tmp/test_app.py",
+                    app=Mock(
+                        cell_manager=Mock(cell_data=Mock(return_value=[]))
+                    ),
+                ),
+                config_manager=Mock(
+                    with_partial=Mock(
+                        return_value=Mock(
+                            get_config=Mock(return_value=DEFAULT_CONFIG)
+                        )
+                    )
+                ),
+                virtual_file_storage="shared_memory",
+                redirect_console_to_browser=False,
+                ttl_seconds=None,
+                auto_instantiate=False,
+                app_host_context=AppHostContext(pool=pool, session_id="s1"),
+            )
+
+        assert callers
+        assert callers[0] != threading.get_ident()
+
 
 @pytest.mark.requires("zmq")
 class TestAppHostKernelManager:

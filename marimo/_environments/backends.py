@@ -93,6 +93,21 @@ def sync_notebook(
         )
 
 
+# Two pods can race one environment manager on a shared slot (a gVisor
+# sandbox's file locks are not shared across pods), so a failed sync is
+# retried once, after a pause in this range (seconds) that lets the other
+# side finish first.
+SYNC_RETRY_PAUSE = (0.5, 2.0)
+
+
+def sync_is_retryable(error: Exception) -> bool:
+    """Whether a failed sync earns its one retry: a notebook without a
+    manifest is missing one whatever the timing."""
+    from marimo._environments.errors import MissingScriptMetadataError
+
+    return not isinstance(error, MissingScriptMetadataError)
+
+
 def launch(
     environment: Environment,
     args: Sequence[str],

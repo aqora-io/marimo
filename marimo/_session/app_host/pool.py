@@ -7,10 +7,14 @@ Each app is run in its own AppHost, providing isolation.
 from __future__ import annotations
 
 import os
+import random
 import threading
+import time
 from concurrent.futures import Future
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
+from marimo import _loggers
 from marimo._environments.environment import (
     ProcessPlan,
 )
@@ -21,6 +25,12 @@ from marimo._environments.errors import (
 from marimo._environments.overlay import runtime_overlay
 from marimo._session.app_host.host import AppHost
 from marimo._session.managers.ipc import KernelStartupError
+
+if TYPE_CHECKING:
+    from marimo._environments.environment import Environment
+    from marimo._environments.sandbox import Backend
+
+LOGGER = _loggers.marimo_logger()
 
 
 class AppHostPool:
@@ -94,7 +104,7 @@ class AppHostPool:
         overlay = runtime_overlay()
         try:
             try:
-                handle = backends.sync_notebook(abs_path, backend=backend)
+                handle = self._sync(abs_path, backend)
             except MissingScriptMetadataError:
                 plan = backends.launch_fallback(args)
                 plan.env.pop("MARIMO_SANDBOX_MODE", None)
@@ -107,6 +117,25 @@ class AppHostPool:
             return plan
         except EnvironmentManagerError as error:
             raise KernelStartupError(str(error)) from error
+
+    @staticmethod
+    def _sync(abs_path: str, backend: Backend) -> Environment:
+        """Sync the notebook's environment, retried once like an IPC
+        kernel's (see `backends.SYNC_RETRY_PAUSE`). Blocks through the pause
+        as through the sync itself: sessions create hosts off the event loop.
+        """
+        from marimo._environments import backends
+
+        try:
+            return backends.sync_notebook(abs_path, backend=backend)
+        except EnvironmentManagerError as error:
+            if not backends.sync_is_retryable(error):
+                raise
+            LOGGER.warning(
+                "Retrying environment sync for %s after: %s", abs_path, error
+            )
+            time.sleep(random.uniform(*backends.SYNC_RETRY_PAUSE))
+            return backends.sync_notebook(abs_path, backend=backend)
 
     def shutdown(self) -> None:
         with self._lock:

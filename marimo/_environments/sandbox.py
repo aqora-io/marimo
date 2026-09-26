@@ -10,6 +10,7 @@ operation and are cleaned by `script_metadata`.
 from __future__ import annotations
 
 import asyncio
+import random
 import re
 import shlex
 import subprocess
@@ -20,6 +21,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, Protocol
 
+from marimo import _loggers
 from marimo._environments import script_metadata
 from marimo._environments.errors import (
     EnvironmentManagerError,
@@ -35,6 +37,8 @@ if TYPE_CHECKING:
     from marimo._environments.overlay import RuntimeOverlay
     from marimo._environments.script_metadata import MaterializedScript
     from marimo._utils.uv_tree import DependencyTreeNode
+
+LOGGER = _loggers.marimo_logger()
 
 Backend = Literal["uv", "pixi"]
 SandboxOperation = Literal["prepare", "add", "upgrade", "remove", "sync"]
@@ -351,18 +355,36 @@ class NotebookSandbox:
             self._require_metadata_block()
         await self._adapter.ensure_available_async()
         lock = _LAUNCH_LOCKS.setdefault(self._source, asyncio.Lock())
-        async with lock:
-            if prepare:
-                script_metadata.ensure_metadata_block(self._source)
-                await self._adapter.prepare_source_async(self._source)
+
+        async def sync_once() -> Environment:
             async with script_metadata.materialized_for_environment_async(
                 self._source
             ) as target:
-                environment = await self._adapter.sync_async(
+                return await self._adapter.sync_async(
                     target,
                     python_override=python_override,
                     on_output=on_output,
                 )
+
+        async with lock:
+            if prepare:
+                script_metadata.ensure_metadata_block(self._source)
+                await self._adapter.prepare_source_async(self._source)
+            try:
+                environment = await sync_once()
+            except EnvironmentManagerError as error:
+                from marimo._environments import backends
+
+                if not backends.sync_is_retryable(error):
+                    raise
+                # Other sessions of this notebook wait out the retry too.
+                LOGGER.warning(
+                    "Retrying environment sync for %s after: %s",
+                    self._source,
+                    error,
+                )
+                await asyncio.sleep(random.uniform(*backends.SYNC_RETRY_PAUSE))
+                environment = await sync_once()
         self._environment = environment
         self._environment_source = self._source
         return self._launch_plan(environment, args, overlay, base_env)
