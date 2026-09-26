@@ -187,6 +187,7 @@ def create_kernel(
             args.set_ui_element_queue,
         ),
         hooks=_build_hooks(args.is_edit_mode, user_config),
+        session_mode=args.mode,
     )
     ctx = initialize_kernel_context(
         kernel=kernel,

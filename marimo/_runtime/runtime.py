@@ -506,6 +506,7 @@ class Kernel:
         module (ModuleType): Module in which to execute code.
         enqueue_control_request (Callable[[ControlRequest], None]): Callback to enqueue control requests.
         debugger_override (marimo_pdb.MarimoPdb | None): A replacement for the built-in Pdb.
+        session_mode (SessionMode): Whether the kernel serves an editor or an app.
     """
 
     def __init__(
@@ -519,7 +520,11 @@ class Kernel:
         enqueue_control_request: Callable[[CommandMessage], None],
         hooks: NotebookCellHooks,
         debugger_override: marimo_pdb.MarimoPdb | None = None,
+        session_mode: SessionMode = SessionMode.EDIT,
     ) -> None:
+        # Known before the runtime context exists, so the user config
+        # applied below can tell an app's kernel from an editor's.
+        self.session_mode = session_mode
         self.app_metadata = app_metadata
         self.query_params = QueryParams(app_metadata.query_params)
         self.cli_args = CLIArgs(app_metadata.cli_args)

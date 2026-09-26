@@ -1,12 +1,13 @@
 # Copyright 2026 Marimo. All rights reserved.
 from __future__ import annotations
 
+import asyncio
 import re
 import stat
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING
-from unittest.mock import patch
+from typing import TYPE_CHECKING, Any
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -14,6 +15,7 @@ from marimo._environments import script_metadata
 from marimo._environments.environment import Environment, ProcessPlan
 from marimo._environments.errors import (
     EnvironmentManagerError,
+    MissingScriptMetadataError,
     SandboxRestartRequired,
 )
 from marimo._environments.overlay import RuntimeOverlay
@@ -40,13 +42,20 @@ class FakeBackend:
         self.root = root
         self.sync_targets: list[str] = []
         self.add_requests: list[str] = []
+        self.prepared: list[str] = []
         self.versions: dict[str, str] = {"obstore": "0.8.2"}
 
     def ensure_available(self) -> None:
         pass
 
+    async def ensure_available_async(self) -> None:
+        pass
+
     def prepare_source(self, source: str) -> None:
-        del source
+        self.prepared.append(source)
+
+    async def prepare_source_async(self, source: str) -> None:
+        self.prepare_source(source)
 
     def add(
         self,
@@ -118,6 +127,21 @@ class FakeBackend:
             python=sys.executable,
             root=str(self.root),
             action="updated",
+        )
+
+    async def sync_async(
+        self,
+        target: MaterializedScript,
+        *,
+        python_override: str | None,
+        on_output: LogCallback | None,
+        active_environment: Environment | None = None,
+    ) -> Environment:
+        return self.sync(
+            target,
+            python_override=python_override,
+            on_output=on_output,
+            active_environment=active_environment,
         )
 
     def packages(
@@ -464,6 +488,147 @@ def test_rebind_changes_the_source_for_the_next_operation(
     assert sandbox.environment_source == str(second)
     assert adapter.sync_targets == [str(first), str(second)]
     assert plan.argv[-2:] == ("-m", "example")
+
+
+def _launch(
+    sandbox: NotebookSandbox, method: str, *, prepare: bool
+) -> ProcessPlan:
+    """Launch through the synchronous or the asynchronous entry point."""
+    args = ["-m", "example"]
+    overlay = RuntimeOverlay(runtime="marimo")
+    if method == "launch_async":
+        return asyncio.run(
+            sandbox.launch_async(args, overlay=overlay, prepare=prepare)
+        )
+    return sandbox.launch(args, overlay=overlay, prepare=prepare)
+
+
+@pytest.mark.parametrize("method", ["launch", "launch_async"])
+@pytest.mark.parametrize("suffix", [".py", ".md"])
+def test_unprepared_launch_syncs_without_writing_the_notebook(
+    tmp_path: Path, method: str, suffix: str
+) -> None:
+    notebook = tmp_path / f"notebook{suffix}"
+    notebook.write_text(
+        "# /// script\n# dependencies = []\n# ///\n\nx = 1\n"
+        if suffix == ".py"
+        else "---\npyproject: |\n  dependencies = []\n---\n\nx = 1\n"
+    )
+    before = notebook.read_bytes()
+    adapter = FakeBackend(tmp_path / "environment")
+    sandbox = NotebookSandbox(str(notebook), "uv", adapter=adapter)
+
+    plan = _launch(sandbox, method, prepare=False)
+
+    assert notebook.read_bytes() == before
+    assert adapter.prepared == []
+    # The notebook's own path keys the environment, as when editing it.
+    with script_metadata.materialized_for_environment(str(notebook)) as target:
+        assert adapter.sync_targets == [target.path]
+    assert sandbox.environment_source == str(notebook)
+    assert plan.argv[-2:] == ("-m", "example")
+
+
+@pytest.mark.parametrize("method", ["launch", "launch_async"])
+@pytest.mark.parametrize("suffix", [".py", ".md"])
+def test_unprepared_launch_requires_a_manifest(
+    tmp_path: Path, method: str, suffix: str
+) -> None:
+    notebook = tmp_path / f"notebook{suffix}"
+    notebook.write_text(
+        "x = 1\n"
+        if suffix == ".py"
+        else "---\ntitle: Notebook\n---\n\nx = 1\n"
+    )
+    before = notebook.read_bytes()
+    adapter = MagicMock()
+    adapter.name = "uv"
+    sandbox = NotebookSandbox(str(notebook), "uv", adapter=adapter)
+
+    with pytest.raises(MissingScriptMetadataError):
+        _launch(sandbox, method, prepare=False)
+
+    # Nothing to synchronize: the backend is never consulted.
+    assert adapter.mock_calls == []
+    assert sandbox.environment is None
+    assert notebook.read_bytes() == before
+    assert list(tmp_path.iterdir()) == [notebook]
+
+
+class OverlapBackend(FakeBackend):
+    """Counts launches between the start of prepare and the end of sync."""
+
+    def __init__(self, root: Path) -> None:
+        super().__init__(root)
+        self.launching: set[asyncio.Task[Any] | None] = set()
+        self.peak = 0
+
+    def _enter(self) -> None:
+        self.launching.add(asyncio.current_task())
+        self.peak = max(self.peak, len(self.launching))
+
+    async def prepare_source_async(self, source: str) -> None:
+        self._enter()
+        await asyncio.sleep(0.01)
+        await super().prepare_source_async(source)
+
+    async def sync_async(
+        self,
+        target: MaterializedScript,
+        *,
+        python_override: str | None,
+        on_output: LogCallback | None,
+        active_environment: Environment | None = None,
+    ) -> Environment:
+        self._enter()
+        await asyncio.sleep(0.01)
+        self.launching.discard(asyncio.current_task())
+        return await super().sync_async(
+            target,
+            python_override=python_override,
+            on_output=on_output,
+            active_environment=active_environment,
+        )
+
+
+@pytest.mark.parametrize("prepare", [True, False])
+@pytest.mark.parametrize(
+    ("names", "peak"),
+    [
+        pytest.param(("one.py", "one.py"), 1, id="same-notebook"),
+        pytest.param(("one.py", "two.py"), 2, id="different-notebooks"),
+    ],
+)
+def test_concurrent_launches_take_turns_per_notebook(
+    tmp_path: Path, prepare: bool, names: tuple[str, str], peak: int
+) -> None:
+    for name in set(names):
+        (tmp_path / name).write_text(
+            "# /// script\n# dependencies = []\n# ///\n"
+        )
+    adapter = OverlapBackend(tmp_path / "environment")
+    # One sandbox per session, as for concurrent viewers of an app.
+    sandboxes = [
+        NotebookSandbox(str(tmp_path / name), "uv", adapter=adapter)
+        for name in names
+    ]
+
+    async def launch_all() -> None:
+        await asyncio.gather(
+            *(
+                sandbox.launch_async(
+                    ["-m", "example"],
+                    overlay=RuntimeOverlay(runtime="marimo"),
+                    prepare=prepare,
+                )
+                for sandbox in sandboxes
+            )
+        )
+
+    asyncio.run(launch_all())
+
+    assert adapter.peak == peak
+    assert len(adapter.sync_targets) == 2
 
 
 def test_packages_does_not_synchronize(tmp_path: Path) -> None:

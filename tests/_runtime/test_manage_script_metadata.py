@@ -26,9 +26,13 @@ from marimo._runtime.packages.package_managers import create_package_manager
 from marimo._runtime.packages.pypi_package_manager import (
     MicropipPackageManager,
     PipPackageManager,
+    UvPackageManager,
 )
 from marimo._runtime.packages.utils import is_python_isolated
 from marimo._runtime.runner import cell_runner
+from marimo._session.model import SessionMode
+from tests._runtime._helpers.factories import default_app_metadata
+from tests._runtime._helpers.session import mocked_kernel_session
 from tests.conftest import MockedKernel, mock_pyodide
 
 if TYPE_CHECKING:
@@ -235,6 +239,66 @@ async def test_manage_script_metadata_pip_noop(
 
     with open(filename) as f:  # noqa: ASYNC230
         assert "" == f.read()
+
+
+@pytest.mark.parametrize(
+    ("kernel", "records"),
+    [("mocked_kernel", True), ("run_mode_kernel", False)],
+)
+async def test_run_mode_never_records_imports_in_script_metadata(
+    tmp_path: pathlib.Path,
+    monkeypatch: pytest.MonkeyPatch,
+    request: pytest.FixtureRequest,
+    kernel: str,
+    records: bool,
+) -> None:
+    k = request.getfixturevalue(kernel).k
+    # Forced on, as a sandboxed kernel's environment used to force it.
+    monkeypatch.setattr(GLOBAL_SETTINGS, "MANAGE_SCRIPT_METADATA", True)
+    await k.rename_file(str(tmp_path / "notebook.py"))
+    package_manager = create_package_manager("uv")
+    update = Mock()
+    monkeypatch.setattr(
+        package_manager, "update_notebook_script_metadata", update
+    )
+    k.packages_callbacks.package_manager = package_manager
+
+    k._maybe_register_cell("0", "import markdown", stale=False)
+
+    assert k.packages_callbacks.should_update_script_metadata() is records
+    assert update.called is records
+
+
+@pytest.mark.parametrize(
+    ("mode", "records"), [(SessionMode.EDIT, True), (SessionMode.RUN, False)]
+)
+def test_run_mode_kernel_construction_never_adds_marimo(
+    tmp_path: pathlib.Path,
+    monkeypatch: pytest.MonkeyPatch,
+    mode: SessionMode,
+    records: bool,
+) -> None:
+    # Managed outside a sandbox, as for a writable configured venv. The
+    # kernel applies its user config before its context exists.
+    monkeypatch.setattr(GLOBAL_SETTINGS, "SANDBOX_MODE", None)
+    monkeypatch.setattr(GLOBAL_SETTINGS, "MANAGE_SCRIPT_METADATA", True)
+    update = Mock()
+    monkeypatch.setattr(
+        UvPackageManager, "update_notebook_script_metadata", update
+    )
+
+    with mocked_kernel_session(
+        mode=mode,
+        app_metadata=default_app_metadata(
+            filename=str(tmp_path / "notebook.py")
+        ),
+        user_config=merge_default_config(
+            {"package_management": {"manager": "uv"}}
+        ),
+    ):
+        pass
+
+    assert update.called is records
 
 
 @mock_pyodide()
