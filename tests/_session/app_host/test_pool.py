@@ -171,18 +171,59 @@ def test_manifestless_host_clears_inherited_sandbox_identity(
     pool.shutdown()
 
 
-def test_environment_failure_is_reported_without_fallback() -> None:
+def test_environment_failure_is_reported_without_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import random
+
     from marimo._environments.uv import UvError
     from marimo._session.managers.ipc import KernelStartupError
 
+    monkeypatch.setattr(random, "uniform", lambda _lo, _hi: 0.0)
     pool = AppHostPool(sandbox=True)
     with (
         patch(
             "marimo._environments.backends.sync_notebook",
             side_effect=UvError("solver diagnostic"),
-        ),
+        ) as sync,
         patch("marimo._environments.backends.launch_fallback") as fallback,
     ):
         with pytest.raises(KernelStartupError, match="solver diagnostic"):
             pool.get_or_create("nb.py")
+    # Retried once, like an IPC kernel's sync, before giving up.
+    assert sync.call_count == 2
     fallback.assert_not_called()
+
+
+def test_a_failed_environment_sync_is_retried_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Two pods racing one environment (a gVisor sandbox's file locks are
+    not shared across pods) must not fail a run-mode host any more than an
+    IPC kernel: its sync is retried once too."""
+    import random
+
+    from marimo._environments.pixi import PixiCommandError
+
+    monkeypatch.setattr(random, "uniform", lambda _lo, _hi: 0.0)
+    environment = MagicMock()
+    pool = AppHostPool(sandbox=True)
+    with (
+        patch(
+            "marimo._environments.backends.sync_notebook",
+            side_effect=[PixiCommandError(["pixi"], 1, "busy"), environment],
+        ) as sync,
+        patch(
+            "marimo._environments.backends.launch",
+            return_value=MagicMock(env={}),
+        ) as launch,
+        patch(
+            "marimo._session.app_host.pool.runtime_overlay", return_value=[]
+        ),
+        patch("marimo._session.app_host.pool.AppHost") as create,
+    ):
+        pool.get_or_create("nb.py")
+    assert sync.call_count == 2
+    assert launch.call_args.args[0] is environment
+    create.assert_called_once()
+    pool.shutdown()

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import random
 import re
 import stat
 import sys
@@ -553,6 +554,98 @@ def test_unprepared_launch_requires_a_manifest(
     assert sandbox.environment is None
     assert notebook.read_bytes() == before
     assert list(tmp_path.iterdir()) == [notebook]
+
+
+def test_launch_async_retries_once_after_a_transient_sync_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A transient EnvironmentManagerError -- e.g. two pods racing the same
+    pixi install under gVisor, whose file locks are not shared across
+    sandboxes -- is retried once before giving up."""
+    from marimo import _loggers
+    from marimo._environments.pixi import PixiCommandError
+
+    monkeypatch.setattr(_loggers.marimo_logger(), "propagate", True)
+    monkeypatch.setattr(random, "uniform", lambda _lo, _hi: 0.0)
+    notebook = tmp_path / "notebook.py"
+    notebook.write_text("# /// script\n# dependencies = []\n# ///\n")
+    adapter = FakeBackend(tmp_path / "environment")
+    environment = Environment(
+        python=sys.executable, root=str(adapter.root), action="updated"
+    )
+
+    with patch.object(
+        adapter,
+        "sync_async",
+        side_effect=[
+            PixiCommandError(["pixi"], 1, "solver busy"),
+            environment,
+        ],
+    ) as sync_async:
+        sandbox = NotebookSandbox(str(notebook), "uv", adapter=adapter)
+        with caplog.at_level("WARNING"):
+            plan = asyncio.run(
+                sandbox.launch_async(
+                    ["-m", "example"], overlay=RuntimeOverlay(runtime="marimo")
+                )
+            )
+
+    assert sync_async.await_count == 2
+    assert sandbox.environment == environment
+    assert plan.argv[-2:] == ("-m", "example")
+    assert str(notebook) in caplog.text
+
+
+def test_launch_async_propagates_after_a_second_sync_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from marimo._environments.pixi import PixiCommandError
+
+    monkeypatch.setattr(random, "uniform", lambda _lo, _hi: 0.0)
+    notebook = tmp_path / "notebook.py"
+    notebook.write_text("# /// script\n# dependencies = []\n# ///\n")
+    adapter = FakeBackend(tmp_path / "environment")
+    error = PixiCommandError(["pixi"], 1, "solver busy")
+
+    with patch.object(adapter, "sync_async", side_effect=error) as sync_async:
+        sandbox = NotebookSandbox(str(notebook), "uv", adapter=adapter)
+        with pytest.raises(PixiCommandError):
+            asyncio.run(
+                sandbox.launch_async(
+                    ["-m", "example"], overlay=RuntimeOverlay(runtime="marimo")
+                )
+            )
+
+    assert sync_async.await_count == 2
+    assert sandbox.environment is None
+
+
+def test_launch_async_never_retries_missing_script_metadata(
+    tmp_path: Path,
+) -> None:
+    from marimo._environments.pixi import PixiMissingScriptMetadataError
+
+    notebook = tmp_path / "notebook.py"
+    notebook.write_text("# /// script\n# dependencies = []\n# ///\n")
+    adapter = FakeBackend(tmp_path / "environment")
+    error = PixiMissingScriptMetadataError(
+        ["pixi", "install", "--script"],
+        1,
+        "does not contain a PEP 723 metadata block",
+    )
+
+    with patch.object(adapter, "sync_async", side_effect=error) as sync_async:
+        sandbox = NotebookSandbox(str(notebook), "uv", adapter=adapter)
+        with pytest.raises(MissingScriptMetadataError):
+            asyncio.run(
+                sandbox.launch_async(
+                    ["-m", "example"], overlay=RuntimeOverlay(runtime="marimo")
+                )
+            )
+
+    assert sync_async.await_count == 1
 
 
 class OverlapBackend(FakeBackend):

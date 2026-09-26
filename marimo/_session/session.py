@@ -144,7 +144,12 @@ class SessionImpl(Session):
                 raise ValueError(
                     "App host isolation requires a file-backed notebook"
                 )
-            app_host = app_host_context.pool.get_or_create(file_path)
+            # Off the event loop: creating a host syncs the notebook's
+            # environment (with a retry) and starts its process, which would
+            # otherwise stall every other session meanwhile.
+            app_host = await asyncio.to_thread(
+                app_host_context.pool.get_or_create, file_path
+            )
             queue_manager = AppHostQueueManager(
                 app_host, app_host_context.session_id
             )
