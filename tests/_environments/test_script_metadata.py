@@ -229,6 +229,108 @@ def __():
     assert script_path.read_text() == expected
 
 
+def test_default_requires_python_uses_the_env_var(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("MARIMO_DEFAULT_REQUIRES_PYTHON", ">=3.12")
+    assert script_metadata.default_requires_python() == ">=3.12"
+
+
+def test_default_requires_python_unset_matches_the_interpreter(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("MARIMO_DEFAULT_REQUIRES_PYTHON", raising=False)
+    major, minor = platform.python_version_tuple()[:2]
+    assert script_metadata.default_requires_python() == f">={major}.{minor}"
+
+
+def test_with_python_version_requirement_honors_the_env_var(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("MARIMO_DEFAULT_REQUIRES_PYTHON", ">=3.12")
+    result = script_metadata.with_python_version_requirement(
+        {"dependencies": ["numpy"]}
+    )
+    assert result == {
+        "dependencies": ["numpy"],
+        "requires-python": ">=3.12",
+    }
+
+
+def test_ensure_requires_python_honors_the_env_var(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("MARIMO_DEFAULT_REQUIRES_PYTHON", ">=3.12")
+    script_path = tmp_path / "test.py"
+    script_path.write_text(
+        "# /// script\n# dependencies = []\n# ///\nimport marimo\n"
+    )
+
+    script_metadata.ensure_requires_python(str(script_path))
+
+    assert '# requires-python = ">=3.12"' in script_path.read_text()
+
+
+def test_ensure_metadata_block_unset_omits_requires_python(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("MARIMO_DEFAULT_REQUIRES_PYTHON", raising=False)
+    script_path = tmp_path / "plain.py"
+    script_path.write_text("print('hi')\n")
+
+    script_metadata.ensure_metadata_block(str(script_path))
+
+    assert script_path.read_text().startswith(
+        "# /// script\n# dependencies = []\n# ///\n"
+    )
+
+
+def test_ensure_metadata_block_honors_the_env_var(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("MARIMO_DEFAULT_REQUIRES_PYTHON", ">=3.12")
+    script_path = tmp_path / "plain.py"
+    script_path.write_text("print('hi')\n")
+
+    script_metadata.ensure_metadata_block(str(script_path))
+
+    assert script_path.read_text().startswith(
+        '# /// script\n# requires-python = ">=3.12"\n# dependencies = []\n'
+        "# ///\n"
+    )
+
+
+def test_ensure_metadata_block_honors_the_env_var_with_a_shebang(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("MARIMO_DEFAULT_REQUIRES_PYTHON", ">=3.12")
+    script_path = tmp_path / "executable.py"
+    script_path.write_text("#!/usr/bin/env python\nprint('hi')\n")
+
+    script_metadata.ensure_metadata_block(str(script_path))
+
+    lines = script_path.read_text().splitlines()
+    assert lines[0] == "#!/usr/bin/env python"
+    assert lines[1] == "# /// script"
+    assert lines[2] == '# requires-python = ">=3.12"'
+    assert lines[3] == "# dependencies = []"
+
+
+def test_ensure_metadata_block_honors_the_env_var_for_markdown(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("MARIMO_DEFAULT_REQUIRES_PYTHON", ">=3.12")
+    notebook = tmp_path / "notebook.md"
+    notebook.write_text("# Hello\n")
+
+    script_metadata.ensure_metadata_block(str(notebook))
+
+    content = notebook.read_text()
+    assert 'requires-python = ">=3.12"' in content
+    assert "dependencies = []" in content
+    assert content.index("requires-python") < content.index("dependencies")
+
+
 @pytest.mark.network
 @pytest.mark.skipif(not HAS_UV, reason="uv required")
 def test_add_and_remove_dependencies(tmp_path: Path) -> None:

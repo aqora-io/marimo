@@ -213,3 +213,34 @@ def test_manifest_and_cell_saves_preserve_each_other(
     assert [cell.code for cell in saved.app.cell_manager.cell_data()] == [
         "x = 2"
     ]
+
+
+def test_new_python_notebook_save_honors_default_requires_python(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A brand-new .py notebook's first save, in sandbox mode, generates a
+    header honoring MARIMO_DEFAULT_REQUIRES_PYTHON."""
+    from marimo._config.settings import GLOBAL_SETTINGS
+    from marimo._server.models.models import SaveNotebookRequest
+
+    monkeypatch.setattr(GLOBAL_SETTINGS, "MANAGE_SCRIPT_METADATA", True)
+    monkeypatch.setenv("MARIMO_DEFAULT_REQUIRES_PYTHON", ">=3.12")
+
+    path = tmp_path / "notebook.py"
+    manager = new_notebook()
+
+    manager.save(
+        SaveNotebookRequest(
+            cell_ids=[],
+            codes=[],
+            names=[],
+            configs=[],
+            filename=str(path),
+            layout=None,
+            persist=True,
+        )
+    )
+
+    content = path.read_text()
+    assert 'requires-python = ">=3.12"' in content
+    assert '"marimo"' in content
