@@ -119,25 +119,43 @@ def _refine(completed: subprocess.CompletedProcess[str]) -> UvCommandError:
 
 
 def find_uv_bin() -> str:
+    """The uv to invoke.
+
+    `MARIMO_UV` names one for marimo alone, as `MARIMO_PIXI_UV` does for the
+    pixi backend: uv sets `UV` to itself in every process it runs, kernels
+    included, so only marimo's own variable reaches the package operations
+    those processes run. It must name an executable file.
+    """
+    override = os.environ.get("MARIMO_UV")
+    if override:
+        if not is_uv_available():
+            raise UvNotFoundError(
+                f"MARIMO_UV={override} is not an executable file"
+            )
+        return override
     return os.environ.get("UV", "uv")
 
 
 def is_uv_available() -> bool:
     """Whether uv can be invoked.
 
-    An explicit `UV` environment variable is trusted as-is (uv sets it when it
-    spawns marimo, and it may point outside the PATH); otherwise the PATH is
-    checked for a `uv` binary.
+    `MARIMO_UV` must name an executable file. An explicit `UV` environment
+    variable is trusted as-is (uv sets it when it spawns marimo, and it may
+    point outside the PATH); otherwise the PATH is checked for a `uv` binary.
     """
+    override = os.environ.get("MARIMO_UV")
+    if override:
+        return os.path.isfile(override) and os.access(override, os.X_OK)
     uv_bin = find_uv_bin()
     return uv_bin != "uv" or shutil.which("uv") is not None
 
 
 def require_uv_bin() -> str:
     """Return the uv binary to invoke, raising `UvNotFoundError` if absent."""
+    uv_bin = find_uv_bin()
     if not is_uv_available():
         raise UvNotFoundError()
-    return find_uv_bin()
+    return uv_bin
 
 
 def uv(

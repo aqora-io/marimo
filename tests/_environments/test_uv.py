@@ -24,6 +24,60 @@ if TYPE_CHECKING:
 HAS_UV = is_uv_available()
 
 
+@pytest.fixture(autouse=True)
+def no_marimo_uv(monkeypatch: pytest.MonkeyPatch) -> None:
+    # How uv is found without marimo's own override, unless a test sets it.
+    monkeypatch.delenv("MARIMO_UV", raising=False)
+
+
+def test_marimo_uv_wins_over_uv(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # uv sets UV to itself in the processes it runs; MARIMO_UV is marimo's.
+    stub = tmp_path / "uv"
+    stub.write_text("#!/bin/sh\n")
+    stub.chmod(0o755)
+    monkeypatch.setenv("UV", "/opt/somewhere/uv")
+    monkeypatch.setenv("MARIMO_UV", str(stub))
+    assert find_uv_bin() == str(stub)
+    assert is_uv_available()
+    assert require_uv_bin() == str(stub)
+
+
+def test_marimo_uv_must_be_an_executable_file(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("UV", "/opt/somewhere/uv")
+    monkeypatch.setenv("MARIMO_UV", str(tmp_path / "missing"))
+    assert not is_uv_available()
+    with pytest.raises(UvNotFoundError, match="MARIMO_UV"):
+        require_uv_bin()
+
+
+@pytest.mark.parametrize(
+    "mode", [None, 0o644], ids=["missing", "not-executable"]
+)
+def test_a_launch_reports_an_unusable_marimo_uv(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, mode: int | None
+) -> None:
+    import asyncio
+
+    from marimo._environments.environment import (
+        ensure_supported_uv,
+        ensure_supported_uv_async,
+    )
+
+    override = tmp_path / "uv"
+    if mode is not None:
+        override.write_text("#!/bin/sh\necho uv 0.12.0\n")
+        override.chmod(mode)
+    monkeypatch.setenv("MARIMO_UV", str(override))
+    with pytest.raises(UvNotFoundError, match="MARIMO_UV"):
+        ensure_supported_uv()
+    with pytest.raises(UvNotFoundError, match="MARIMO_UV"):
+        asyncio.run(ensure_supported_uv_async())
+
+
 def test_find_uv_bin_respects_env_override(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
