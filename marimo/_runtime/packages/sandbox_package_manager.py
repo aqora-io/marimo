@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import importlib.metadata
+import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -18,7 +19,10 @@ from marimo._environments.errors import (
     EnvironmentManagerError,
     SandboxRestartRequired,
 )
-from marimo._environments.sandbox import _redact_url_credentials
+from marimo._environments.sandbox import (
+    _normalize_dependency_name,
+    _redact_url_credentials,
+)
 from marimo._runtime.packages.package_manager import PackageDescription
 from marimo._runtime.packages.pypi_package_manager import PypiPackageManager
 from marimo._runtime.packages.utils import split_packages
@@ -155,31 +159,51 @@ class SandboxPackageManager(PypiPackageManager):
         )
         # Explicit add/remove already updated the manifest. Cell registration
         # can also discover an imported package without any preceding install.
+        # Registration blocks the cell's run, so versions come from this
+        # kernel's own environment rather than a backend solve.
         try:
-            packages = [
-                self.module_to_package(namespace)
-                for namespace in import_namespaces_to_add or []
-            ]
-            runtime_versions: dict[str, str] = {}
+            versions: dict[str, str] = {}
             environment = self._sandbox.environment
             prefix = Path(environment.root).resolve() if environment else None
-            for package in packages:
-                try:
-                    distribution = importlib.metadata.distribution(package)
-                except importlib.metadata.PackageNotFoundError:
+            for namespace in import_namespaces_to_add or []:
+                if namespace in sys.stdlib_module_names:
                     continue
-                # The backend owns packages in its prefix (including conda
-                # packages). Only add metadata from the runtime overlay here.
+                package = self.module_to_package(namespace)
+                try:
+                    # The mapping can name extras, as in ibis-framework[duckdb].
+                    distribution = importlib.metadata.distribution(
+                        _normalize_dependency_name(package)
+                    )
+                except importlib.metadata.PackageNotFoundError:
+                    # Not installed where this kernel runs: nothing to pin.
+                    continue
                 location = Path(str(distribution.locate_file(""))).resolve()
-                if prefix is None or not location.is_relative_to(prefix):
-                    runtime_versions[package] = distribution.version
-            self._sandbox.record_dependencies(
-                packages, runtime_versions=runtime_versions
-            )
+                if (
+                    prefix is not None
+                    and location.is_relative_to(prefix)
+                    and not self._installed_from_pypi(distribution)
+                ):
+                    # A conda package the backend installed is not a PyPI
+                    # dependency to declare.
+                    continue
+                versions[package] = distribution.version
+            self._sandbox.record_dependencies(versions)
             return True
         except EnvironmentManagerError as error:
             self._report(error, None)
             return False
+
+    def _installed_from_pypi(
+        self, distribution: importlib.metadata.Distribution
+    ) -> bool:
+        """Whether the backend installed `distribution` from PyPI."""
+        if self.backend != "pixi":
+            # uv environments hold PyPI packages only.
+            return True
+        from marimo._environments.pixi import PYPI_INSTALLER
+
+        installer = distribution.read_text("INSTALLER") or ""
+        return installer.strip() == PYPI_INSTALLER
 
     def _report(
         self, error: Exception, log_callback: LogCallback | None

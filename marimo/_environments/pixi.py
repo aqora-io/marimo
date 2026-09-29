@@ -33,6 +33,10 @@ if TYPE_CHECKING:
 
 LOGGER = _loggers.marimo_logger()
 
+# pixi writes this to the INSTALLER file of each PyPI package it installs into
+# an environment; its conda packages carry "conda" there instead.
+PYPI_INSTALLER = "uv-pixi"
+
 
 class PixiError(EnvironmentManagerError):
     """Base class for pixi invocation errors."""
