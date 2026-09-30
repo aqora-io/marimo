@@ -104,6 +104,13 @@ class AppHostPool:
         overlay = runtime_overlay()
         try:
             try:
+                # Decided before the backend runs, as for a run-mode IPC
+                # kernel: the backend's own report of a missing manifest is
+                # only its wording, and costs a sync.
+                if _declares_no_manifest(abs_path):
+                    raise MissingScriptMetadataError(
+                        f"No script metadata found in {abs_path}"
+                    )
                 handle = self._sync(abs_path, backend)
             except MissingScriptMetadataError:
                 plan = backends.launch_fallback(args)
@@ -155,3 +162,14 @@ class AppHostContext:
     pool: AppHostPool
     # The session ID corresponding to the kernel to create
     session_id: str
+
+
+def _declares_no_manifest(abs_path: str) -> bool:
+    """Whether the notebook has no PEP 723 manifest. One this cannot read or
+    parse is left to the backend to report."""
+    from marimo._environments import script_metadata
+
+    try:
+        return not script_metadata.has_metadata_block(abs_path)
+    except (OSError, ValueError):
+        return False

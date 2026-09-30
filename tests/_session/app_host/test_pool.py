@@ -2,11 +2,15 @@
 from __future__ import annotations
 
 import os
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from marimo._session.app_host.pool import AppHostPool
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 @pytest.mark.requires("zmq")
@@ -168,6 +172,80 @@ def test_manifestless_host_clears_inherited_sandbox_identity(
     assert "MARIMO_SANDBOX_MODE" not in plan.env
     assert plan.env["MARIMO_MANAGE_SCRIPT_METADATA"] == "true"
     assert os.environ["MARIMO_SANDBOX_MODE"] == "multi"
+    pool.shutdown()
+
+
+def test_a_manifestless_notebook_falls_back_before_the_backend_runs(
+    tmp_path: Path,
+) -> None:
+    notebook = tmp_path / "nb.py"
+    notebook.write_text("import marimo\n\napp = marimo.App()\n")
+    pool = AppHostPool(sandbox=True)
+    with (
+        patch("marimo._environments.backends.sync_notebook") as sync,
+        patch(
+            "marimo._session.app_host.pool.runtime_overlay", return_value=[]
+        ),
+        patch("marimo._session.app_host.pool.AppHost") as create,
+    ):
+        pool.get_or_create(str(notebook))
+    sync.assert_not_called()
+    plan = create.call_args.kwargs["plan"]
+    assert "MARIMO_SANDBOX_MODE" not in plan.env
+    pool.shutdown()
+
+
+def test_a_notebook_with_a_manifest_is_synced(tmp_path: Path) -> None:
+    notebook = tmp_path / "nb.py"
+    notebook.write_text(
+        "# /// script\n# dependencies = []\n# ///\nimport marimo\n"
+    )
+    pool = AppHostPool(sandbox=True)
+    launched = MagicMock()
+    launched.env = {}
+    with (
+        patch("marimo._environments.backends.sync_notebook") as sync,
+        patch("marimo._environments.backends.launch", return_value=launched),
+        patch(
+            "marimo._session.app_host.pool.runtime_overlay", return_value=[]
+        ),
+        patch("marimo._session.app_host.pool.AppHost") as create,
+    ):
+        pool.get_or_create(str(notebook))
+    sync.assert_called_once()
+    assert (
+        create.call_args.kwargs["plan"].env["MARIMO_SANDBOX_MODE"] == "multi"
+    )
+    pool.shutdown()
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        b"# /// script\n# ...\n# ///\nimport marimo\n",
+        b"# /// script\n# dependencies = []\n# ///\n" * 2,
+        b"# /// script\n# dependencies = []\n# ///\n# \xff\n",
+    ],
+    ids=["malformed", "two-blocks", "not-utf-8"],
+)
+def test_an_unparseable_manifest_is_left_to_the_backend_to_report(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, content: bytes
+) -> None:
+    import random
+
+    from marimo._environments.uv import UvError
+    from marimo._session.managers.ipc import KernelStartupError
+
+    monkeypatch.setattr(random, "uniform", lambda _lo, _hi: 0.0)
+    notebook = tmp_path / "nb.py"
+    notebook.write_bytes(content)
+    pool = AppHostPool(sandbox=True)
+    with patch(
+        "marimo._environments.backends.sync_notebook",
+        side_effect=UvError("backend diagnostic"),
+    ):
+        with pytest.raises(KernelStartupError, match="backend diagnostic"):
+            pool.get_or_create(str(notebook))
     pool.shutdown()
 
 
