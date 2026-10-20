@@ -496,6 +496,26 @@ class PyreflyLanguageServerConfig(TypedDict, total=False):
 
 
 @dataclass
+class LeanLanguageServerConfig(TypedDict, total=False):
+    """
+    Configuration options for the Lean Language Server.
+
+    The Lean server (`lake serve`) provides goals, diagnostics, and hover
+    for Lean cells.
+
+    **Keys.**
+
+    - `enabled`: if `True`, enable the Lean language server
+    - `project`: the Lake project to run the server in; relative paths are
+      relative to the directory marimo was launched in. Defaults to the
+      nearest directory with a lakefile at or above the notebook.
+    """
+
+    enabled: bool
+    project: str
+
+
+@dataclass
 class LanguageServersConfig(TypedDict, total=False):
     """Configuration options for language servers.
 
@@ -505,12 +525,14 @@ class LanguageServersConfig(TypedDict, total=False):
     - `basedpyright`: the basedpyright config
     - `ty`: the ty config
     - `pyrefly`: the pyrefly config
+    - `lean`: the Lean config
     """
 
     pylsp: PythonLanguageServerConfig
     basedpyright: BasedpyrightServerConfig
     ty: TyLanguageServerConfig
     pyrefly: PyreflyLanguageServerConfig
+    lean: LeanLanguageServerConfig
 
 
 @dataclass

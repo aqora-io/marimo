@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import os
 import secrets
+import shutil
 import signal
 import socket
 import subprocess
@@ -119,6 +120,7 @@ class BaseLspServer(LspServer):
                 stdin=None,
                 text=True,
                 env={**os.environ, "MARIMO_LSP_TOKEN": self.auth_token},
+                cwd=self.get_cwd(),
                 # Create a new process group so we can kill the entire
                 # tree (parent + children) on shutdown. Without this,
                 # child processes (e.g. copilot language-server.cjs)
@@ -488,6 +490,10 @@ class BaseLspServer(LspServer):
     def get_command(self) -> list[str]:
         raise NotImplementedError()
 
+    def get_cwd(self) -> str | None:
+        """Working directory of the server process; `None` inherits marimo's."""
+        return None
+
     def missing_binary_alert(self) -> AlertNotification:
         raise NotImplementedError()
 
@@ -805,6 +811,83 @@ class NoopLspServer(LspServer):
         return LspRestartResponse(success=True, restarted=[], errors={})
 
 
+def _find_lake_project(start: Path) -> Path | None:
+    """The nearest directory at or above `start` with a lakefile."""
+    start = start.resolve()
+    for directory in (start, *start.parents):
+        if (directory / "lakefile.toml").is_file() or (
+            directory / "lakefile.lean"
+        ).is_file():
+            return directory
+    return None
+
+
+class LeanLspServer(BaseLspServer):
+    id = "lean"
+
+    def __init__(
+        self,
+        port: int,
+        config_reader: MarimoConfigManager | None = None,
+        start_path: str | None = None,
+    ) -> None:
+        super().__init__(port)
+        self.config_reader = config_reader
+        # The notebook, or the directory marimo was launched on
+        self.start_path = start_path
+        self.log_file = _loggers.get_log_directory() / "lean-lsp.log"
+
+    def get_cwd(self) -> str | None:
+        # `lake serve` must run in the Lake project so that imports resolve.
+        # Relative paths are relative to the directory marimo was launched in.
+        if self.config_reader is not None:
+            config = cast(
+                Any,
+                self.config_reader.get_config().get("language_servers", {}),
+            )
+            project = config.get("lean", {}).get("project")
+            if project:
+                return str(Path(project).expanduser())
+        # Like `Lean()` in marimo-lean, default to the nearest Lake project.
+        start = Path(self.start_path or os.getcwd())
+        found = _find_lake_project(start if start.is_dir() else start.parent)
+        return None if found is None else str(found)
+
+    def validate_requirements(self) -> str | Literal[True]:
+        if not DependencyManager.which("lake"):
+            return "lake is missing. Install Lean at https://lean-lang.org/install/."
+
+        if not DependencyManager.which("node"):
+            return "node.js binary is missing. Install node at https://nodejs.org/."
+
+        cwd = self.get_cwd()
+        if cwd is not None and not Path(cwd).is_dir():
+            return f"Lean project directory {cwd} does not exist."
+
+        return True
+
+    def get_command(self) -> list[str]:
+        lsp_bin = marimo_package_path() / "_lsp" / "index.cjs"
+
+        return [
+            "node",
+            str(lsp_bin),
+            "--port",
+            str(self.port),
+            "--lsp",
+            f"lean:{shutil.which('lake')}",
+            "--log-file",
+            str(self.log_file),
+        ]
+
+    def missing_binary_alert(self) -> AlertNotification:
+        return AlertNotification(
+            title="Lean: Connection Error",
+            description=f"<span>The Lean language server needs <a class='hyperlink' href='https://lean-lang.org/install/'>Lean</a> and node.js, and the Lean project in Settings > Editor > Language Servers must be an existing directory. Check {self.log_file} for details.</span>",
+            variant="danger",
+        )
+
+
 class CompositeLspServer(LspServer):
     LANGUAGE_SERVERS = {
         "pylsp": PyLspServer,
@@ -812,12 +895,14 @@ class CompositeLspServer(LspServer):
         "ty": TyServer,
         "pyrefly": PyreflyServer,
         "copilot": CopilotLspServer,
+        "lean": LeanLspServer,
     }
 
     def __init__(
         self,
         config_reader: MarimoConfigManager,
         min_port: int,
+        start_path: str | None = None,
     ) -> None:
         self.config_reader = config_reader
         self.min_port = min_port
@@ -833,7 +918,12 @@ class CompositeLspServer(LspServer):
         self.servers: dict[str, LspServer] = {}
         for server_name, server_constructor in self.LANGUAGE_SERVERS.items():
             last_free_port = find_free_port(last_free_port + 1)
-            self.servers[server_name] = server_constructor(last_free_port)
+            self.servers[server_name] = (
+                # Lean reads its project directory from the config
+                LeanLspServer(last_free_port, config_reader, start_path)
+                if server_constructor is LeanLspServer
+                else server_constructor(last_free_port)
+            )
 
     def _is_enabled(self, config: MarimoConfig, server_name: str) -> bool:
         if server_name == "copilot":

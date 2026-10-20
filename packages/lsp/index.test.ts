@@ -45,6 +45,11 @@ describe("parseTypedCommand", () => {
     expect(result).toEqual(["/path/with spaces/ty", "server"]);
   });
 
+  it("should parse lean commands correctly", () => {
+    const result = parseTypedCommand("lean:/home/user/.elan/bin/lake");
+    expect(result).toEqual(["/home/user/.elan/bin/lake", "serve"]);
+  });
+
   it("should fallback to old format for commands without colon", () => {
     const result = parseTypedCommand("node /path/to/binary --stdio");
     expect(result).toEqual(["node", "/path/to/binary", "--stdio"]);

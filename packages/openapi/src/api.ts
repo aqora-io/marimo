@@ -5756,9 +5756,11 @@ export interface components {
      *         - `basedpyright`: the basedpyright config
      *         - `ty`: the ty config
      *         - `pyrefly`: the pyrefly config
+     *         - `lean`: the Lean config
      */
     LanguageServersConfig: {
       basedpyright?: components["schemas"]["BasedpyrightServerConfig"];
+      lean?: components["schemas"]["LeanLanguageServerConfig"];
       pylsp?: components["schemas"]["PythonLanguageServerConfig"];
       pyrefly?: components["schemas"]["PyreflyLanguageServerConfig"];
       ty?: components["schemas"]["TyLanguageServerConfig"];
@@ -5767,6 +5769,24 @@ export interface components {
     LayoutConfig: {
       data: Record<string, any>;
       type: string;
+    };
+    /**
+     * LeanLanguageServerConfig
+     * @description Configuration options for the Lean Language Server.
+     *
+     *     The Lean server (`lake serve`) provides goals, diagnostics, and hover
+     *     for Lean cells.
+     *
+     *     **Keys.**
+     *
+     *     - `enabled`: if `True`, enable the Lean language server
+     *     - `project`: the Lake project to run the server in; relative paths are
+     *       relative to the directory marimo was launched in. Defaults to the
+     *       nearest directory with a lakefile at or above the notebook.
+     */
+    LeanLanguageServerConfig: {
+      enabled?: boolean;
+      project?: string;
     };
     /**
      * LintConfig

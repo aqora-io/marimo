@@ -3270,10 +3270,13 @@ components:
     LanguageServersConfig:
       description: "Configuration options for language servers.\n\n    **Keys.**\n\
         \n    - `pylsp`: the pylsp config\n    - `basedpyright`: the basedpyright\
-        \ config\n    - `ty`: the ty config\n    - `pyrefly`: the pyrefly config"
+        \ config\n    - `ty`: the ty config\n    - `pyrefly`: the pyrefly config\n\
+        \    - `lean`: the Lean config"
       properties:
         basedpyright:
           $ref: '#/components/schemas/BasedpyrightServerConfig'
+        lean:
+          $ref: '#/components/schemas/LeanLanguageServerConfig'
         pylsp:
           $ref: '#/components/schemas/PythonLanguageServerConfig'
         pyrefly:
@@ -3293,6 +3296,21 @@ components:
       - type
       - data
       title: LayoutConfig
+      type: object
+    LeanLanguageServerConfig:
+      description: "Configuration options for the Lean Language Server.\n\nThe Lean\
+        \ server (`lake serve`) provides goals, diagnostics, and hover\nfor Lean cells.\n\
+        \n**Keys.**\n\n- `enabled`: if `True`, enable the Lean language server\n-\
+        \ `project`: the Lake project to run the server in; relative paths are\n \
+        \ relative to the directory marimo was launched in. Defaults to the\n  nearest\
+        \ directory with a lakefile at or above the notebook."
+      properties:
+        enabled:
+          type: boolean
+        project:
+          type: string
+      required: []
+      title: LeanLanguageServerConfig
       type: object
     LintConfig:
       description: "Configuration for lint rule selection.\n\n    Follows ruff-inspired\

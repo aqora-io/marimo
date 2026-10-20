@@ -12,6 +12,7 @@ import { cellIdState } from "../../cells/state";
 import { formatSQL } from "../../format";
 import { languageAdapterState } from "../extension";
 import { LeanLanguageAdapter } from "../languages/lean/lean";
+import { leanGoalsField } from "../languages/lean/lsp-extension";
 import { MarkdownLanguageAdapter } from "../languages/markdown";
 import {
   SQLLanguageAdapter,
@@ -23,7 +24,7 @@ import {
   updateLanguageMetadata,
 } from "../metadata";
 import type { LanguageMetadataOf } from "../types";
-import { LeanEnvInput } from "./lean";
+import { LeanEnvInput, LeanGoalsView, LeanQuotePrefixToggles } from "./lean";
 import { getQuotePrefix, MarkdownQuotePrefixTooltip } from "./markdown";
 import { SQLEngineSelect, SQLModeSelect } from "./sql";
 
@@ -37,6 +38,7 @@ export const LanguagePanelComponent: React.FC<{
   const cellId = view.state.facet(cellIdState);
 
   let actions: React.ReactNode = <div />;
+  let below: React.ReactNode = null;
   let showDivider = false;
 
   // Send noop update code event, which will trigger an update to the new output variable name
@@ -210,7 +212,14 @@ export const LanguagePanelComponent: React.FC<{
           optional={true}
           onChange={(parentEnv) => triggerUpdate<Metadata3>({ parentEnv })}
         />
+        <LeanQuotePrefixToggles
+          quotePrefix={metadata.quotePrefix}
+          onChange={(quotePrefix) => triggerUpdate<Metadata3>({ quotePrefix })}
+        />
       </div>
+    );
+    below = (
+      <LeanGoalsView goals={view.state.field(leanGoalsField, false) ?? null} />
     );
   }
 
@@ -221,6 +230,7 @@ export const LanguagePanelComponent: React.FC<{
         {showDivider && <Divider />}
         {languageAdapter.type}
       </div>
+      {below}
     </TooltipProvider>
   );
 };

@@ -4,6 +4,7 @@ import type { LanguageServerClient } from "@marimo-team/codemirror-languageserve
 import type { DocumentUri } from "vscode-languageserver-protocol";
 import type { CellId } from "@/core/cells/ids";
 import { invariant } from "@/utils/invariant";
+import { hasFunctionProperty, isRecord } from "@/utils/records";
 import type { TypedString } from "@/utils/typed";
 
 type LanguageServerClientMember =
@@ -98,5 +99,31 @@ export function isClientWithProcessNotification(
   return (
     "processNotification" in client &&
     typeof client.processNotification === "function"
+  );
+}
+
+interface UntypedLanguageServerMethods {
+  request: (
+    method: string,
+    params: unknown,
+    timeout: number,
+    signal?: AbortSignal,
+  ) => Promise<unknown>;
+  notify: (method: string, params: unknown) => Promise<void>;
+}
+
+/**
+ * `LanguageServerClient#request`/`#notify` are protected and generic over the
+ * library's own `LSPRequestMap`/`LSPNotifyMap`
+ * This asserts the two inherited methods we need are present.
+ */
+export function assertHasLanguageServerRpc(
+  value: unknown,
+): asserts value is UntypedLanguageServerMethods {
+  invariant(
+    isRecord(value) &&
+      hasFunctionProperty(value, "request") &&
+      hasFunctionProperty(value, "notify"),
+    "LanguageServerClient is missing request/notify",
   );
 }

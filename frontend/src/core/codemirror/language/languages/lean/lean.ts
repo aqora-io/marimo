@@ -3,8 +3,17 @@
 import { StreamLanguage } from "@codemirror/language";
 import type { Extension } from "@codemirror/state";
 import { type LeanMetadata, LeanParser } from "@marimo-team/smart-cells";
+import type { CellId } from "@/core/cells/ids";
+import type {
+  CompletionConfig,
+  DiagnosticsConfig,
+  LSPConfig,
+} from "@/core/config/config-schema";
+import type { HotkeyProvider } from "@/core/hotkeys/hotkeys";
+import type { PlaceholderType } from "../../../config/types";
 import type { LanguageAdapter } from "../../types";
 import { leanMode } from "./lean-mode";
+import { leanLsp } from "./lsp-extension";
 import { leanUnicodeInput } from "./unicode-input";
 
 export type LeanLanguageAdapterMetadata = LeanMetadata;
@@ -39,7 +48,17 @@ export class LeanLanguageAdapter implements LanguageAdapter<LeanLanguageAdapterM
     return this.parser.isSupported(pythonCode);
   }
 
-  public getExtension(): Extension[] {
-    return [StreamLanguage.define(leanMode), leanUnicodeInput()];
+  public getExtension(
+    cellId: CellId,
+    _completionConfig: CompletionConfig,
+    _hotkeys: HotkeyProvider,
+    _placeholderType: PlaceholderType,
+    lspConfig: LSPConfig & { diagnostics?: DiagnosticsConfig },
+  ): Extension[] {
+    return [
+      StreamLanguage.define(leanMode),
+      leanUnicodeInput(),
+      lspConfig?.lean?.enabled ? leanLsp(cellId) : [],
+    ];
   }
 }

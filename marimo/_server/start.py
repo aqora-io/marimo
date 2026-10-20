@@ -266,6 +266,7 @@ def start(
         lsp_composite_server = CompositeLspServer(
             config_reader=config_reader,
             min_port=DEFAULT_PORT + 400,
+            start_path=start_path,
         )
 
     if watch and config_reader.is_auto_save_enabled:

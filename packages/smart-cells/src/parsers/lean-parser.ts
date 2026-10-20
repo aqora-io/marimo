@@ -1,6 +1,12 @@
 /* Copyright 2026 Marimo. All rights reserved. */
 
-import type { FormatResult, LanguageParser, ParseResult } from "../types.js";
+import type {
+  FormatResult,
+  LanguageParser,
+  ParseResult,
+  QuotePrefixKind,
+} from "../types.js";
+import { QUOTE_PREFIX_KINDS } from "../types.js";
 import { parseArgsKwargs, parsePythonAST, safeDedent } from "../utils/index.js";
 
 export interface LeanMetadata {
@@ -8,12 +14,15 @@ export interface LeanMetadata {
   envName: string;
   /** Python expression for the parent environment, or "" for none */
   parentEnv: string;
+  /** String prefix: `r` keeps backslashes, `f` interpolates Python values */
+  quotePrefix: QuotePrefixKind;
   commentLines: readonly string[];
 }
 
 interface LeanParseInfo {
   envName: string;
   parentEnv: string;
+  quotePrefix: QuotePrefixKind;
   leanCode: string;
   commentLines: string[];
   startPosition: number;
@@ -31,6 +40,7 @@ export class LeanParser implements LanguageParser<LeanMetadata> {
   readonly defaultMetadata: LeanMetadata = {
     envName: "_env",
     parentEnv: "",
+    quotePrefix: "r",
     commentLines: [],
   };
 
@@ -50,18 +60,23 @@ export class LeanParser implements LanguageParser<LeanMetadata> {
       metadata: {
         envName: info.envName,
         parentEnv: info.parentEnv,
+        quotePrefix: info.quotePrefix,
         commentLines: info.commentLines,
       },
     };
   }
 
   transformOut(code: string, metadata: LeanMetadata): FormatResult {
-    const { envName, parentEnv, commentLines } = metadata;
+    const { envName, parentEnv, quotePrefix, commentLines } = metadata;
     // Raw strings keep Lean code verbatim, but cannot contain `"""`.
-    const [quote, body] = code.includes('"""')
-      ? ['"""', code.replaceAll("\\", "\\\\").replaceAll('"', '\\"')]
-      : ['r"""', code];
-    const start = [...commentLines, `${envName} = lean(${quote}\n`].join("\n");
+    const raw = quotePrefix.includes("r") && !code.includes('"""');
+    const prefix = raw ? quotePrefix : quotePrefix.replace("r", "");
+    const body = raw
+      ? code
+      : code.replaceAll("\\", "\\\\").replaceAll('"', '\\"');
+    const start = [...commentLines, `${envName} = lean(${prefix}"""\n`].join(
+      "\n",
+    );
     const envParam = parentEnv ? `, env=${parentEnv}` : "";
     return {
       code: `${start}${body}\n"""${envParam})`,
@@ -126,22 +141,22 @@ function parseLeanStatement(code: string): LeanParseInfo | null {
   const { args, kwargs } = parseArgsKwargs(argList.cursor(), code);
   if (
     args.length !== 1 ||
-    args[0].name !== "String" ||
+    (args[0].name !== "String" && args[0].name !== "FormatString") ||
     kwargs.some(({ key }) => key !== "env")
   ) {
     return null;
   }
 
   const literal = code.slice(args[0].from, args[0].to);
-  let content: string | null = null;
-  let prefixLength = 0;
-  if (literal.startsWith('r"""') && literal.endsWith('"""')) {
-    prefixLength = 4;
-    content = literal.slice(prefixLength, -3);
-  } else if (literal.startsWith('"""') && literal.endsWith('"""')) {
-    prefixLength = 3;
-    content = unescape(literal.slice(prefixLength, -3));
+  const quotePrefix = QUOTE_PREFIX_KINDS.find((prefix) =>
+    literal.startsWith(`${prefix}"""`),
+  );
+  if (quotePrefix === undefined || !literal.endsWith('"""')) {
+    return null;
   }
+  const prefixLength = quotePrefix.length + 3;
+  const body = literal.slice(prefixLength, -3);
+  const content = quotePrefix.includes("r") ? body : unescape(body);
   if (content === null) {
     return null;
   }
@@ -149,6 +164,7 @@ function parseLeanStatement(code: string): LeanParseInfo | null {
   return {
     envName: code.slice(target.from, target.to),
     parentEnv: kwargs.find(({ key }) => key === "env")?.value ?? "",
+    quotePrefix,
     leanCode: safeDedent(content),
     commentLines,
     // Where the Lean code starts, after the newline following the quotes.

@@ -18,6 +18,7 @@ import { useForm } from "react-hook-form";
 import type z from "zod";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { acceptCompletionOnEnterAtom } from "@/core/codemirror/completion/accept-on-enter-atom";
 import {
   Form,
@@ -701,6 +702,65 @@ export const UserConfigForm: React.FC = () => {
                         environment.
                       </Banner>
                     )}
+                  </div>
+                )}
+              />
+              <OverriddenFormField
+                control={form.control}
+                name="language_servers.lean.enabled"
+                render={({ field, override }) => (
+                  <FormItem className={formItemClasses}>
+                    <FormLabel>
+                      Lean (
+                      <ExternalLink href="https://github.com/leanprover/lean4">
+                        docs
+                      </ExternalLink>
+                      )
+                    </FormLabel>
+                    <FormControl>
+                      <Checkbox
+                        data-testid="lean-checkbox"
+                        checked={override.value}
+                        disabled={field.disabled || override.isOverridden}
+                        onCheckedChange={(checked) => {
+                          field.onChange(Boolean(checked));
+                        }}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                    <IsOverridden override={override} />
+                  </FormItem>
+                )}
+              />
+              <OverriddenFormField
+                control={form.control}
+                name="language_servers.lean.project"
+                render={({ field, override }) => (
+                  <div className="flex flex-col space-y-1">
+                    <FormItem className={formItemClasses}>
+                      <FormLabel>Lean project</FormLabel>
+                      <FormControl>
+                        <Input
+                          data-testid="lean-project-input"
+                          rootClassName="flex-1"
+                          className="m-0 inline-flex h-7"
+                          placeholder="nearest Lake project"
+                          {...field}
+                          value={override.value ?? ""}
+                          disabled={override.isOverridden}
+                          onChange={(e) => {
+                            field.onChange(e.target.value);
+                          }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                      <IsOverridden override={override} />
+                    </FormItem>
+                    <FormDescription>
+                      The Lake project the Lean server runs in. Defaults to
+                      the nearest one at or above the notebook. Restart the
+                      server after changing it.
+                    </FormDescription>
                   </div>
                 )}
               />

@@ -17,6 +17,7 @@ describe("LeanLanguageAdapter", () => {
     expect(metadata).toEqual({
       envName: "env1",
       parentEnv: "env0",
+      quotePrefix: "r",
       commentLines: [],
     });
     const [out, outOffset] = adapter.transformOut(code, metadata);

@@ -10,6 +10,7 @@ import type { LSPConfig } from "@/core/config/config-schema";
 import { documentationAtom } from "@/core/documentation/state";
 import { store } from "@/core/state/jotai";
 import { Logger } from "@/utils/Logger";
+import { languageAdapterState } from "../language/extension";
 import { reactiveReferencesField } from "../reactive-references/extension";
 import { AUTOCOMPLETER, Autocompleter } from "./Autocompleter";
 
@@ -23,6 +24,12 @@ export function hintTooltip(lspConfig: LSPConfig) {
       ? []
       : hoverTooltip(
           async (view, pos) => {
+            // Lean cells get hover from the Lean language server
+            if (
+              view.state.field(languageAdapterState, false)?.type === "lean"
+            ) {
+              return null;
+            }
             const result = await requestDocumentation({
               view,
               pos,

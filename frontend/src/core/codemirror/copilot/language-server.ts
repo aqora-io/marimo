@@ -16,9 +16,8 @@ import type {
 } from "vscode-languageserver-protocol";
 import { VersionedTextDocumentIdentifier } from "vscode-languageserver-protocol";
 import { store } from "@/core/state/jotai";
-import { invariant } from "@/utils/invariant";
 import { Logger } from "@/utils/Logger";
-import { hasFunctionProperty, isRecord } from "@/utils/records";
+import { isRecord } from "@/utils/records";
 import { getCodes } from "./getCodes";
 import {
   clearGitHubCopilotLoadingVersion,
@@ -33,6 +32,7 @@ import type {
   GitHubCopilotStatusResult,
 } from "./types";
 import type { LanguageAdapterType } from "../language/types";
+import { assertHasLanguageServerRpc } from "../lsp/types";
 
 const logger = Logger.get("@github/copilot-language-server");
 const REQUEST_TIMEOUT_MS = 10_000;
@@ -50,32 +50,6 @@ export interface LSPRequestMap {
     InlineCompletionParams,
     InlineCompletionList | InlineCompletionItem[] | null,
   ];
-}
-
-interface UntypedLanguageServerMethods {
-  request: (
-    method: string,
-    params: unknown,
-    timeout: number,
-    signal?: AbortSignal,
-  ) => Promise<unknown>;
-  notify: (method: string, params: unknown) => Promise<void>;
-}
-
-/**
- * `LanguageServerClient#request`/`#notify` are protected and generic over the
- * library's own `LSPRequestMap`/`LSPNotifyMap`
- * This asserts the two inherited methods we need are present.
- */
-function assertHasLanguageServerRpc(
-  value: unknown,
-): asserts value is UntypedLanguageServerMethods {
-  invariant(
-    isRecord(value) &&
-      hasFunctionProperty(value, "request") &&
-      hasFunctionProperty(value, "notify"),
-    "LanguageServerClient is missing request/notify",
-  );
 }
 
 /**

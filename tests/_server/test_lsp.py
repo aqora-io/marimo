@@ -23,6 +23,7 @@ from marimo._server.lsp import (
     BaseLspServer,
     CompositeLspServer,
     CopilotLspServer,
+    LeanLspServer,
     PyLspServer,
     PyreflyServer,
     TyServer,
@@ -124,6 +125,7 @@ async def test_base_lsp_server_start_stop(
         BasedpyrightServer,
         TyServer,
         PyreflyServer,
+        LeanLspServer,
     ],
 )
 async def test_lsp_launch_keeps_token_out_of_argv(
@@ -421,7 +423,7 @@ def test_composite_server():
     with mock.patch("marimo._server.lsp.DependencyManager") as mock_dm:
         mock_dm.pylsp = mock.MagicMock()
         mock_dm.pylsp.has.return_value = True
-        total_lsp_servers = 5
+        total_lsp_servers = 6
         config = LanguageServersConfig(
             {
                 "pylsp": {"enabled": True},
@@ -443,6 +445,10 @@ def test_composite_server():
         assert (
             len(server.servers) == total_lsp_servers
         )  # Both pylsp and copilot enabled
+        lean_server = server.servers["lean"]
+        assert isinstance(lean_server, LeanLspServer)
+        assert lean_server.config_reader is config_reader
+        assert server._is_enabled(config, "lean") is False
         assert server._is_enabled(config, "pylsp") is True
         assert server._is_enabled(config, "copilot") is True
         assert server._is_enabled(config, "ty") is True
@@ -608,6 +614,83 @@ def test_pyrefly_server_uses_typed_format():
         assert lsp_command.startswith("pyrefly:")
         # Should NOT contain shell arguments
         assert "server" not in lsp_command
+
+
+def _lean_config_reader(project: str | None) -> MarimoConfigManager:
+    lean_config = {"enabled": True}
+    if project is not None:
+        lean_config["project"] = project
+    return get_default_config_manager(current_path=None).with_overrides(
+        {"language_servers": {"lean": lean_config}}
+    )
+
+
+def test_lean_server_uses_typed_format_and_project_cwd(tmp_path: Path):
+    server = LeanLspServer(
+        port=8000, config_reader=_lean_config_reader(str(tmp_path))
+    )
+    with mock.patch("shutil.which", return_value="/path/to/lake"):
+        command = server.get_command()
+
+    lsp_command = command[command.index("--lsp") + 1]
+    assert lsp_command == "lean:/path/to/lake"
+    assert server.get_cwd() == str(tmp_path)
+
+
+def test_lean_server_defaults_to_nearest_lake_project(tmp_path: Path):
+    (tmp_path / "lakefile.toml").write_text("")
+    notebook = tmp_path / "notebooks" / "notebook.py"
+    notebook.parent.mkdir()
+    notebook.write_text("")
+    project = str(tmp_path.resolve())
+
+    for config_reader in (None, _lean_config_reader(None)):
+        server = LeanLspServer(
+            port=8000, config_reader=config_reader, start_path=str(notebook)
+        )
+        assert server.get_cwd() == project
+    # `marimo edit <directory>`
+    server = LeanLspServer(port=8000, start_path=str(notebook.parent))
+    assert server.get_cwd() == project
+    # The config takes precedence
+    server = LeanLspServer(
+        port=8000,
+        config_reader=_lean_config_reader(str(notebook.parent)),
+        start_path=str(notebook),
+    )
+    assert server.get_cwd() == str(notebook.parent)
+
+
+def test_lean_server_defaults_to_launch_directory_without_lakefile(
+    tmp_path: Path,
+):
+    server = LeanLspServer(port=8000, start_path=str(tmp_path / "notebook.py"))
+    assert server.get_cwd() is None
+
+
+def test_lean_server_validate_requirements(tmp_path: Path):
+    def which(*missing: str):
+        return mock.patch(
+            "marimo._server.lsp.DependencyManager.which",
+            side_effect=lambda cmd: cmd not in missing,
+        )
+
+    server = LeanLspServer(
+        port=8000, config_reader=_lean_config_reader(str(tmp_path))
+    )
+    with which():
+        assert server.validate_requirements() is True
+    with which("lake"):
+        assert "lake" in str(server.validate_requirements())
+    with which("node"):
+        assert "node" in str(server.validate_requirements())
+
+    missing = str(tmp_path / "missing")
+    server = LeanLspServer(
+        port=8000, config_reader=_lean_config_reader(missing)
+    )
+    with which():
+        assert missing in str(server.validate_requirements())
 
 
 def test_ty_server_uses_typed_format():

@@ -123,6 +123,8 @@ export function parseTypedCommand(typedCommand: string): string[] {
       return [binaryPath, "lsp"];
     case "ty":
       return [binaryPath, "server"];
+    case "lean":
+      return [binaryPath, "serve"];
     default:
       throw new Error(`Unknown LSP server type: ${serverType}`);
   }

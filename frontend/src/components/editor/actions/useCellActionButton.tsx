@@ -20,6 +20,7 @@ import {
   PlusCircleIcon,
   ScissorsIcon,
   SparklesIcon,
+  SquareSigmaIcon,
   TextCursorInputIcon,
   Trash2Icon,
   XCircleIcon,
@@ -36,7 +37,10 @@ import {
 import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/use-toast";
 import { aiCompletionCellAtom } from "@/core/ai/state";
-import { maybeAddMarimoImport } from "@/core/cells/add-missing-import";
+import {
+  maybeAddLeanImport,
+  maybeAddMarimoImport,
+} from "@/core/cells/add-missing-import";
 import { hasOnlyOneCellAtom, useCellActions } from "@/core/cells/cells";
 import { type CellId, SETUP_CELL_ID } from "@/core/cells/ids";
 import type { CellData } from "@/core/cells/types";
@@ -270,6 +274,38 @@ export function useCellActionButtons({ cell, closePopover }: Props) {
               });
               switchLanguage(editorView, {
                 language: "sql",
+                keepCodeAsIs: false,
+              });
+            },
+            hidden: isSetupCell,
+          },
+      getCurrentLanguageAdapter(getEditorView()) === "lean"
+        ? {
+            icon: <PythonIcon />,
+            label: "View as Python",
+            handle: () => {
+              const editorView = getEditorView();
+              if (!editorView) {
+                return;
+              }
+              toggleToLanguage(editorView, "python", { force: true });
+            },
+            hidden: isSetupCell,
+          }
+        : {
+            icon: <SquareSigmaIcon size={13} strokeWidth={1.5} />,
+            label: "Convert to Lean",
+            handle: () => {
+              const editorView = getEditorView();
+              if (!editorView) {
+                return;
+              }
+              maybeAddLeanImport({
+                autoInstantiate,
+                createNewCell: createCell,
+              });
+              switchLanguage(editorView, {
+                language: "lean",
                 keepCodeAsIs: false,
               });
             },
