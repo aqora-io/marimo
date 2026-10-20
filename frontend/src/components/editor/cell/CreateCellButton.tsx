@@ -1,5 +1,10 @@
 /* Copyright 2026 Marimo. All rights reserved. */
-import { DatabaseIcon, DiamondPlusIcon, PlusIcon } from "lucide-react";
+import {
+  DatabaseIcon,
+  DiamondPlusIcon,
+  PlusIcon,
+  SquareSigmaIcon,
+} from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/editor/inputs/Inputs";
 import { MinimalHotkeys } from "@/components/shortcuts/renderShortcut";
@@ -9,7 +14,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { maybeAddMarimoImport } from "@/core/cells/add-missing-import";
+import {
+  maybeAddLeanImport,
+  maybeAddMarimoImport,
+} from "@/core/cells/add-missing-import";
 import { useCellActions } from "@/core/cells/cells";
 import { LanguageAdapters } from "@/core/codemirror/language/LanguageAdapters";
 import { MARKDOWN_INITIAL_HIDE_CODE } from "@/core/codemirror/language/languages/markdown";
@@ -71,6 +79,11 @@ export const CreateCellButton = ({
   const addSQLCell = () => {
     maybeAddMarimoImport({ autoInstantiate: true, createNewCell });
     onClick?.({ code: LanguageAdapters.sql.defaultCode });
+  };
+
+  const addLeanCell = () => {
+    maybeAddLeanImport({ autoInstantiate: true, createNewCell });
+    onClick?.({ code: LanguageAdapters.lean.defaultCode });
   };
 
   const addSetupCell = () => {
@@ -171,6 +184,10 @@ export const CreateCellButton = ({
         <DropdownMenuItem onClick={addSQLCell}>
           {renderIcon(<DatabaseIcon size={13} strokeWidth={1.5} />)}
           SQL cell
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={addLeanCell}>
+          {renderIcon(<SquareSigmaIcon size={13} strokeWidth={1.5} />)}
+          Lean cell
         </DropdownMenuItem>
         <DropdownMenuItem onClick={addSetupCell}>
           {renderIcon(<DiamondPlusIcon size={13} strokeWidth={1.5} />)}

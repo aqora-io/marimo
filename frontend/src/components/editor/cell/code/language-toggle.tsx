@@ -1,7 +1,7 @@
 /* Copyright 2026 Marimo. All rights reserved. */
 
 import type { EditorView } from "@codemirror/view";
-import { DatabaseIcon } from "lucide-react";
+import { DatabaseIcon, SquareSigmaIcon } from "lucide-react";
 import type React from "react";
 import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
@@ -39,6 +39,10 @@ export const LanguageToggles: React.FC<LanguageTogglesProps> = ({
     () => LanguageAdapters.sql.isSupported(code) || code.trim() === "",
     [code],
   );
+  const canUseLean = useMemo(
+    () => LanguageAdapters.lean.isSupported(code) || code.trim() === "",
+    [code],
+  );
 
   return (
     <div className={className}>
@@ -72,6 +76,21 @@ export const LanguageToggles: React.FC<LanguageTogglesProps> = ({
         }
         toType="markdown"
         displayName="Markdown"
+        onAfterToggle={onAfterToggle}
+      />
+      <LanguageToggle
+        editorView={editorView}
+        currentLanguageAdapter={currentLanguageAdapter}
+        canSwitchToLanguage={canUseLean && currentLanguageAdapter === "python"}
+        icon={
+          <SquareSigmaIcon
+            color={"var(--sky-11)"}
+            strokeWidth={2.5}
+            className="w-4 h-4"
+          />
+        }
+        toType="lean"
+        displayName="Lean"
         onAfterToggle={onAfterToggle}
       />
       <LanguageToggle

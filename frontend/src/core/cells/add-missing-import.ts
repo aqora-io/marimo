@@ -129,3 +129,45 @@ export function maybeAddAltairImport({
   });
   return added ? newCellId : null;
 }
+
+/**
+ * Adds `from marimo_lean import lean` to the notebook if `lean` is not defined.
+ *
+ * Returns the ID of the new cell if added, otherwise null.
+ */
+export function maybeAddLeanImport({
+  autoInstantiate,
+  createNewCell,
+}: {
+  autoInstantiate: boolean;
+  createNewCell: CellActions["createNewCell"];
+}): CellId | null {
+  const importStatement = "from marimo_lean import lean";
+  if ("lean" in store.get(variablesAtom)) {
+    return null;
+  }
+  const { cellData, cellIds } = store.get(notebookAtom);
+  if (
+    cellIds.inOrderIds.some((id) => cellData[id].code.includes(importStatement))
+  ) {
+    return null;
+  }
+
+  const newCellId = CellId.create();
+  createNewCell({
+    cellId: "__end__",
+    before: false,
+    code: importStatement,
+    lastCodeRun: autoInstantiate ? importStatement : undefined,
+    newCellId: newCellId,
+    skipIfCodeExists: true,
+    autoFocus: false,
+  });
+  if (autoInstantiate) {
+    void getRequestClient().sendRun({
+      cellIds: [newCellId],
+      codes: [importStatement],
+    });
+  }
+  return newCellId;
+}

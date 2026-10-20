@@ -47,6 +47,7 @@
     "@hookform/resolvers": "^5.9.1",
     "@img-comparison-slider/react": "^8.0.2",
     "@internationalized/date": "^3.12.4",
+    "@leanprover/unicode-input": "0.1.12",
     "@lezer/common": "^1.5.2",
     "@lezer/highlight": "^1.2.3",
     "@lezer/lr": "^1.4.10",

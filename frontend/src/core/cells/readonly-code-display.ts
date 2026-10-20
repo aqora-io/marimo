@@ -1,6 +1,10 @@
 /* Copyright 2026 Marimo. All rights reserved. */
 
-import { MarkdownParser, SQLParser } from "@marimo-team/smart-cells";
+import {
+  LeanParser,
+  MarkdownParser,
+  SQLParser,
+} from "@marimo-team/smart-cells";
 import type { LanguageAdapterType } from "@/core/codemirror/language/types";
 
 export interface ReadonlyCodeDisplay {
@@ -10,9 +14,10 @@ export interface ReadonlyCodeDisplay {
 
 const markdownParser = new MarkdownParser();
 const sqlParser = new SQLParser();
+const leanParser = new LeanParser();
 
 /**
- * Unwrap SQL and markdown cells so read-only views show inner content with the
+ * Unwrap SQL, markdown and Lean cells so read-only views show inner content with the
  * correct syntax highlighting instead of the raw Python wrapper.
  */
 export function getReadonlyCodeDisplay(code: string): ReadonlyCodeDisplay {
@@ -30,6 +35,10 @@ export function getReadonlyCodeDisplay(code: string): ReadonlyCodeDisplay {
 
   if (sqlParser.isSupported(trimmed)) {
     return { code: sqlParser.transformIn(trimmed).code, language: "sql" };
+  }
+
+  if (leanParser.isSupported(trimmed)) {
+    return { code: leanParser.transformIn(trimmed).code, language: "lean" };
   }
   return { code, language: "python" };
 }

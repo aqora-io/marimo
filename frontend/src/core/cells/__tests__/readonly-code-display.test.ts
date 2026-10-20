@@ -33,6 +33,14 @@ describe("getReadonlyCodeDisplay", () => {
     expect(result.code).toBe("## Heading");
   });
 
+  it("unwraps Lean cells to their inner code", () => {
+    const result = getReadonlyCodeDisplay(
+      'env1 = lean(r"""\n#check Nat\n""", env=env0)',
+    );
+    expect(result.language).toBe("lean");
+    expect(result.code).toBe("#check Nat");
+  });
+
   it("treats empty or whitespace-only code as python", () => {
     expect(getReadonlyCodeDisplay("")).toEqual({
       code: "",

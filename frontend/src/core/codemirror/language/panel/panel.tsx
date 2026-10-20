@@ -11,6 +11,7 @@ import { useAutoGrowInputProps } from "@/hooks/useAutoGrowInputProps";
 import { cellIdState } from "../../cells/state";
 import { formatSQL } from "../../format";
 import { languageAdapterState } from "../extension";
+import { LeanLanguageAdapter } from "../languages/lean/lean";
 import { MarkdownLanguageAdapter } from "../languages/markdown";
 import {
   SQLLanguageAdapter,
@@ -22,6 +23,7 @@ import {
   updateLanguageMetadata,
 } from "../metadata";
 import type { LanguageMetadataOf } from "../types";
+import { LeanEnvInput } from "./lean";
 import { getQuotePrefix, MarkdownQuotePrefixTooltip } from "./markdown";
 import { SQLEngineSelect, SQLModeSelect } from "./sql";
 
@@ -185,6 +187,29 @@ export const LanguagePanelComponent: React.FC<{
         <Tooltip content={<MarkdownQuotePrefixTooltip />}>
           <InfoIcon className="w-3 h-3" />
         </Tooltip>
+      </div>
+    );
+  }
+
+  if (languageAdapter instanceof LeanLanguageAdapter) {
+    type Metadata3 = LanguageMetadataOf<LeanLanguageAdapter>;
+    const metadata = view.state.field(languageMetadataField) as Metadata3;
+
+    showDivider = true;
+
+    actions = (
+      <div className="flex flex-1 gap-4 items-center">
+        <LeanEnvInput
+          label="Output env:"
+          value={metadata.envName}
+          onChange={(envName) => triggerUpdate<Metadata3>({ envName })}
+        />
+        <LeanEnvInput
+          label="From env:"
+          value={metadata.parentEnv}
+          optional={true}
+          onChange={(parentEnv) => triggerUpdate<Metadata3>({ parentEnv })}
+        />
       </div>
     );
   }

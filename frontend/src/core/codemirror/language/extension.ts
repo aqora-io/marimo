@@ -254,6 +254,9 @@ export function languageAdapterFromCode(doc: string): LanguageAdapter {
   if (LanguageAdapters.sql.isSupported(doc)) {
     return LanguageAdapters.sql;
   }
+  if (LanguageAdapters.lean.isSupported(doc)) {
+    return LanguageAdapters.lean;
+  }
 
   return LanguageAdapters.python;
 }

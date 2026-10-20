@@ -11,6 +11,7 @@ import {
   SparklesIcon,
   SquareCodeIcon,
   SquareMIcon,
+  SquareSigmaIcon,
 } from "lucide-react";
 import { useEffect } from "react";
 import { useOpenSettingsToTab } from "@/components/app-config/state";
@@ -20,7 +21,10 @@ import { PackageAlert } from "@/components/editor/package-alert";
 import { SortableCellsProvider } from "@/components/sort/SortableCellsProvider";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
-import { maybeAddMarimoImport } from "@/core/cells/add-missing-import";
+import {
+  maybeAddLeanImport,
+  maybeAddMarimoImport,
+} from "@/core/cells/add-missing-import";
 import { SETUP_CELL_ID } from "@/core/cells/ids";
 import { LanguageAdapters } from "@/core/codemirror/language/LanguageAdapters";
 import { MARKDOWN_INITIAL_HIDE_CODE } from "@/core/codemirror/language/languages/markdown";
@@ -337,6 +341,24 @@ const AddCellButtons: React.FC<{
         >
           <DatabaseIcon className="mr-2 size-4 shrink-0" />
           SQL
+        </Button>
+        <Button
+          className={buttonClass}
+          variant="text"
+          size="sm"
+          disabled={!canInteractWithApp}
+          onClick={() => {
+            maybeAddLeanImport({ autoInstantiate: true, createNewCell });
+
+            createNewCell({
+              cellId: { type: "__end__", columnId },
+              before: false,
+              code: LanguageAdapters.lean.defaultCode,
+            });
+          }}
+        >
+          <SquareSigmaIcon className="mr-2 size-4 shrink-0" />
+          Lean
         </Button>
         {aiEnabled && (
           <Tooltip

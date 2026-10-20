@@ -3870,7 +3870,7 @@ export interface components {
        * @default python
        * @enum {unknown}
        */
-      language?: "markdown" | "python" | "sql";
+      language?: "lean" | "markdown" | "python" | "sql";
       prompt: string;
       /** @default null */
       selectedText?: string | null;
@@ -3933,7 +3933,7 @@ export interface components {
        * @default python
        * @enum {unknown}
        */
-      language?: "markdown" | "python" | "sql";
+      language?: "lean" | "markdown" | "python" | "sql";
       prefix: string;
       suffix: string;
     };

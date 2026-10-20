@@ -86,6 +86,11 @@ describe("getInitialLanguageAdapter", () => {
     const state = createState("df = mo.sql('hello')");
     expect(getInitialLanguageAdapter(state).type).toBe("sql");
   });
+
+  it("should return lean", () => {
+    const state = createState('env1 = lean(r"""#check Nat""", env=env0)');
+    expect(getInitialLanguageAdapter(state).type).toBe("lean");
+  });
 });
 
 describe("switchLanguage", () => {

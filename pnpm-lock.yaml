@@ -116,6 +116,9 @@ importers:
       '@internationalized/date':
         specifier: ^3.12.4
         version: 3.12.4
+      '@leanprover/unicode-input':
+        specifier: 0.1.12
+        version: 0.1.12
       '@lezer/common':
         specifier: ^1.5.2
         version: 1.5.2
@@ -1502,6 +1505,9 @@ packages:
 
   '@keyv/serialize@1.1.1':
     resolution: {integrity: sha512-dXn3FZhPv0US+7dtJsIi2R+c7qWYiReoEh5zUntWCf4oSpMNib8FDhSoed6m3QyZdx5hK7iLFkYk3rNxwt8vTA==}
+
+  '@leanprover/unicode-input@0.1.12':
+    resolution: {integrity: sha512-IS+Yip4T/LZ8eQN+pg+iybZcbUXaVdqBe33ko4zXSmORH/AefCx8a7kZJFNPrgw6IZlu3nhS7RtZf4aiKJD3CA==}
 
   '@lezer/common@1.5.2':
     resolution: {integrity: sha512-sxQE460fPZyU3sdc8lafxiPwJHBzZRy/udNFynGQky1SePYBdhkBl1kOagA9uT3pxR8K09bOrmTUqA9wb/PjSQ==}
@@ -10237,6 +10243,8 @@ snapshots:
       keyv: 5.5.4
 
   '@keyv/serialize@1.1.1': {}
+
+  '@leanprover/unicode-input@0.1.12': {}
 
   '@lezer/common@1.5.2': {}
 

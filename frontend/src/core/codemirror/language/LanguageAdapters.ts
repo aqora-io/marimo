@@ -1,6 +1,7 @@
 /* Copyright 2026 Marimo. All rights reserved. */
 
 import { once } from "@/utils/once";
+import { LeanLanguageAdapter } from "./languages/lean/lean";
 import { MarkdownLanguageAdapter } from "./languages/markdown";
 import { PythonLanguageAdapter } from "./languages/python";
 import { SQLLanguageAdapter } from "./languages/sql/sql";
@@ -10,6 +11,7 @@ import type { LanguageAdapter, LanguageAdapterType } from "./types";
 const createPythonAdapter = once(() => new PythonLanguageAdapter());
 const createMarkdownAdapter = once(() => new MarkdownLanguageAdapter());
 const createSqlAdapter = once(() => new SQLLanguageAdapter());
+const createLeanAdapter = once(() => new LeanLanguageAdapter());
 
 export const LanguageAdapters: Record<LanguageAdapterType, LanguageAdapter> = {
   // Getters to prevent circular dependencies
@@ -21,6 +23,9 @@ export const LanguageAdapters: Record<LanguageAdapterType, LanguageAdapter> = {
   },
   get sql() {
     return createSqlAdapter();
+  },
+  get lean() {
+    return createLeanAdapter();
   },
 };
 

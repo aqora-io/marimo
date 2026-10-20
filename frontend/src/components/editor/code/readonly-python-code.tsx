@@ -4,6 +4,7 @@ import { markdown } from "@codemirror/lang-markdown";
 import { sql } from "@codemirror/lang-sql";
 import {
   defaultHighlightStyle,
+  StreamLanguage,
   syntaxHighlighting,
 } from "@codemirror/language";
 import CodeMirror, {
@@ -17,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { toast } from "@/components/ui/use-toast";
 import type { LanguageAdapterType } from "@/core/codemirror/language/types";
+import { leanMode } from "@/core/codemirror/language/languages/lean/lean-mode";
 import { customPythonLanguageSupport } from "@/core/codemirror/language/languages/python";
 import { darkTheme } from "@/core/codemirror/theme/dark";
 import { lightTheme } from "@/core/codemirror/theme/light";
@@ -31,6 +33,10 @@ const pythonExtensions = [
 ];
 const sqlExtensions = [sql(), EditorView.lineWrapping];
 const markdownExtensions = [markdown(), EditorView.lineWrapping];
+const leanExtensions = [
+  StreamLanguage.define(leanMode),
+  EditorView.lineWrapping,
+];
 
 function readonlyCodeExtensions(language: LanguageAdapterType) {
   switch (language) {
@@ -38,6 +44,8 @@ function readonlyCodeExtensions(language: LanguageAdapterType) {
       return sqlExtensions;
     case "markdown":
       return markdownExtensions;
+    case "lean":
+      return leanExtensions;
     default:
       return pythonExtensions;
   }

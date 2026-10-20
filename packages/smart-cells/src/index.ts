@@ -1,5 +1,7 @@
 /* Copyright 2026 Marimo. All rights reserved. */
 
+export type { LeanMetadata } from "./parsers/lean-parser.js";
+export { LeanParser } from "./parsers/lean-parser.js";
 export type { MarkdownMetadata } from "./parsers/markdown-parser.js";
 export { MarkdownParser } from "./parsers/markdown-parser.js";
 export { PythonParser } from "./parsers/python-parser.js";
