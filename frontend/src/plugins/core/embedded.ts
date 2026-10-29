@@ -41,19 +41,29 @@ export function initializeEmbedded() {
         focusElement(element, data.data);
         break;
 
-      case "click":
+      case "click": {
+        const focus = data.data.focus ?? true;
         switch (element.nodeName) {
           case "MARIMO-BUTTON":
           case "MARIMO-CHECKBOX":
+            clickButton(element.shadowRoot.querySelector("button"), focus);
+            break;
+
           case "MARIMO-DROPDOWN":
-            clickButton(element.shadowRoot.querySelector("button"));
+            // Opening a menu is transient UI intent, not a value change.
+            // A relinquished focus intent must not open an autofocusing popup.
+            if (focus) {
+              clickButton(element.shadowRoot.querySelector("button"), true);
+            }
             break;
 
           case "MARIMO-TEXT":
           case "MARIMO-TEXT-AREA":
-            element.shadowRoot
-              .querySelector<HTMLElement>("input, textarea")
-              ?.focus({ preventScroll: true });
+            if (focus) {
+              element.shadowRoot
+                .querySelector<HTMLElement>("input, textarea")
+                ?.focus({ preventScroll: true });
+            }
             break;
 
           case "MARIMO-SLIDER":
@@ -61,7 +71,7 @@ export function initializeEmbedded() {
               element,
               data.data.objectId as UIElementId,
               data.data,
-              true,
+              focus,
             );
             break;
 
@@ -71,6 +81,7 @@ export function initializeEmbedded() {
                 element.shadowRoot.querySelector(
                   `button[value="${CSS.escape(data.data.value)}"]` as HTMLButtonSelector,
                 ),
+                focus,
               );
             }
             break;
@@ -83,11 +94,12 @@ export function initializeEmbedded() {
               if (matches.length !== 1) {
                 break;
               }
-              clickButton(matches[0]);
+              clickButton(matches[0], focus);
             }
             break;
         }
         break;
+      }
 
       case "change":
         switch (element.nodeName) {
@@ -138,6 +150,7 @@ export function initializeEmbedded() {
 const Message = object({
   message: literal("click"),
   objectId: string(),
+  focus: boolean().optional(),
   value: string().optional(),
   testid: string().optional(),
   position: number().min(0).max(1).optional(),
@@ -163,8 +176,10 @@ const Message = object({
     }),
   );
 
-function clickButton(button: HTMLButtonElement | null) {
-  button?.focus({ preventScroll: true });
+function clickButton(button: HTMLButtonElement | null, focus: boolean) {
+  if (focus) {
+    button?.focus({ preventScroll: true });
+  }
   button?.click();
 }
 

@@ -464,4 +464,74 @@ describe("embedded input handoff", () => {
     );
     expect(UI_ELEMENT_REGISTRY.lookupValue(OBJECT_ID)).toBe(4);
   });
+  it("replays a queued button click once without taking focus from outside the notebook", async () => {
+    const { shadow } = await mount("marimo-button", {
+      initialValue: 0,
+      label: "Run",
+      kind: "neutral",
+    });
+    const outside = document.createElement("input");
+    document.body.append(outside);
+    mounted.push(outside);
+    outside.focus();
+    send({ message: "click", focus: false });
+    await waitFor(() =>
+      expect(UI_ELEMENT_REGISTRY.lookupValue(OBJECT_ID)).toBe(1),
+    );
+    expect(document.activeElement).toBe(outside);
+    expect(shadow.activeElement).toBeNull();
+  });
+
+  it("replays a slider position without taking focus from outside the notebook", async () => {
+    const { shadow } = await mount("marimo-slider", sliderData());
+    const outside = document.createElement("input");
+    document.body.append(outside);
+    mounted.push(outside);
+    outside.focus();
+    send({ message: "click", testid: "track", position: 0.8, focus: false });
+    await waitFor(() =>
+      expect(UI_ELEMENT_REGISTRY.lookupValue(OBJECT_ID)).toBe(8),
+    );
+    expect(document.activeElement).toBe(outside);
+    expect(shadow.activeElement).toBeNull();
+  });
+
+  it("does not steal outside focus when replaying a searchable dropdown click", async () => {
+    HTMLElement.prototype.scrollIntoView ??= vi.fn();
+    await mount("marimo-dropdown", {
+      initialValue: ["first"],
+      label: null,
+      options: ["first", "second"],
+      allowSelectNone: false,
+      searchable: true,
+    });
+    const outside = document.createElement("input");
+    document.body.append(outside);
+    mounted.push(outside);
+    outside.focus();
+    send({ message: "click", focus: false });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(document.activeElement).toBe(outside);
+    expect(UI_ELEMENT_REGISTRY.lookupValue(OBJECT_ID)).toEqual(["first"]);
+  });
+  it.each([undefined, true])(
+    "opens a searchable dropdown with default/owned focus intent=%s",
+    async (focus) => {
+      HTMLElement.prototype.scrollIntoView ??= vi.fn();
+      await mount("marimo-dropdown", {
+        initialValue: ["first"],
+        label: null,
+        options: ["first", "second"],
+        allowSelectNone: false,
+        searchable: true,
+      });
+      send({ message: "click", ...(focus === undefined ? {} : { focus }) });
+      await waitFor(() => {
+        const search = document.querySelector("input[role=combobox]");
+        expect(search).not.toBeNull();
+        expect(document.activeElement).toBe(search);
+      });
+      expect(UI_ELEMENT_REGISTRY.lookupValue(OBJECT_ID)).toEqual(["first"]);
+    },
+  );
 });
