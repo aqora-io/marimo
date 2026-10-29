@@ -45,6 +45,9 @@ export function useResponsiveEmbedRef<T extends HTMLElement>() {
     });
 
     const onWindowMessage = (event: MessageEvent<unknown>) => {
+      if (event.source !== window.parent) {
+        return;
+      }
       if (event.data === "hello") {
         window.parent.postMessage(
           { message: "hello", height: measureHeight() },
@@ -53,10 +56,11 @@ export function useResponsiveEmbedRef<T extends HTMLElement>() {
         ro.observe(root);
         mo.observe(root, { childList: true, subtree: true });
         unsub?.();
-        unsub = store.sub(readinessAtom, () => {
-          const readiness = store.get(readinessAtom);
-          window.parent.postMessage(readiness, "*");
-        });
+        const publishReadiness = () => {
+          window.parent.postMessage(store.get(readinessAtom), event.origin);
+        };
+        unsub = store.sub(readinessAtom, publishReadiness);
+        publishReadiness();
       } else if (event.data === "bye") {
         mo.disconnect();
         ro.disconnect();
@@ -76,7 +80,7 @@ export function useResponsiveEmbedRef<T extends HTMLElement>() {
       ro.disconnect();
       unsub?.();
     };
-  }, []);
+  }, [store]);
 
   return ref;
 }
