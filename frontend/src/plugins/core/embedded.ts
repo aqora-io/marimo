@@ -37,6 +37,10 @@ export function initializeEmbedded() {
     }
 
     switch (data.data.message) {
+      case "focus":
+        focusElement(element, data.data);
+        break;
+
       case "click":
         switch (element.nodeName) {
           case "MARIMO-BUTTON":
@@ -137,16 +141,27 @@ const Message = object({
   value: string().optional(),
   testid: string().optional(),
   position: number().min(0).max(1).optional(),
-}).or(
-  object({
-    message: literal("change"),
-    objectId: string(),
-    value: string(),
-    focus: boolean().optional(),
-    selectionStart: number().int().nonnegative().optional(),
-    selectionEnd: number().int().nonnegative().optional(),
-  }),
-);
+})
+  .or(
+    object({
+      message: literal("change"),
+      objectId: string(),
+      value: string(),
+      focus: boolean().optional(),
+      selectionStart: number().int().nonnegative().optional(),
+      selectionEnd: number().int().nonnegative().optional(),
+    }),
+  )
+  .or(
+    object({
+      message: literal("focus"),
+      objectId: string(),
+      testid: string().optional(),
+      value: string().optional(),
+      selectionStart: number().int().nonnegative().optional(),
+      selectionEnd: number().int().nonnegative().optional(),
+    }),
+  );
 
 function clickButton(button: HTMLButtonElement | null) {
   button?.focus({ preventScroll: true });
@@ -197,20 +212,98 @@ function changeField(
     field.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
   });
   if (change.focus) {
-    field.focus({ preventScroll: true });
-    if (
-      field instanceof HTMLTextAreaElement ||
-      ["text", "search", "tel", "url", "password"].includes(field.type)
-    ) {
-      const start = change.selectionStart ?? change.value.length;
-      field.setSelectionRange(start, change.selectionEnd ?? start);
-    }
+    const start = change.selectionStart ?? change.value.length;
+    focusControl(field, {
+      selectionStart: start,
+      selectionEnd: change.selectionEnd ?? start,
+    });
   } else {
     // An earlier queued field was already left in the preview. Its buffered
     // edit must commit before the next replayed action without taking focus.
     field.dispatchEvent(
       new FocusEvent("focusout", { bubbles: true, composed: true }),
     );
+  }
+}
+
+function focusControl(
+  control: HTMLElement,
+  selection: { selectionStart?: number; selectionEnd?: number },
+) {
+  control.focus({ preventScroll: true });
+  if (
+    (selection.selectionStart !== undefined ||
+      selection.selectionEnd !== undefined) &&
+    (control instanceof HTMLTextAreaElement ||
+      (control instanceof HTMLInputElement &&
+        ["text", "search", "tel", "url", "password"].includes(control.type)))
+  ) {
+    const start = selection.selectionStart ?? control.selectionStart ?? 0;
+    control.setSelectionRange(start, selection.selectionEnd ?? start);
+  }
+}
+
+function focusElement(
+  element: HTMLElement,
+  target: {
+    testid?: string;
+    value?: string;
+    selectionStart?: number;
+    selectionEnd?: number;
+  },
+) {
+  const root = element.shadowRoot;
+  if (!root) {
+    return;
+  }
+  const selector =
+    "input:not([type=hidden]), textarea, button, select, [role=slider]";
+  const canFocus = (control: HTMLElement) =>
+    control.matches(selector) &&
+    !control.matches(":disabled, [aria-disabled=true], [data-disabled]") &&
+    !control.closest("[hidden], [aria-hidden=true], [inert]") &&
+    control.style.display !== "none";
+  let control: HTMLElement | undefined;
+  if (target.testid) {
+    const matches = root.querySelectorAll<HTMLElement>(
+      `[data-testid="${CSS.escape(target.testid)}"]`,
+    );
+    if (matches.length === 1 && matches[0].matches(selector)) {
+      if (!canFocus(matches[0])) {
+        return;
+      }
+      control = matches[0];
+    }
+  }
+  if (!control && target.value !== undefined) {
+    const matches = root.querySelectorAll<HTMLButtonElement>(
+      `button[value="${CSS.escape(target.value)}"]`,
+    );
+    if (matches.length === 1) {
+      if (!canFocus(matches[0])) {
+        return;
+      }
+      control = matches[0];
+    }
+  }
+  if (!control && element.nodeName === "MARIMO-SLIDER") {
+    // A value identifies the slider's optional native number field; the
+    // track/thumb has no value property and focuses the live slider instead.
+    control =
+      target.value !== undefined
+        ? editableField(root)
+        : (root.querySelector<HTMLElement>("[role=slider]") ?? undefined);
+  }
+  if (!control) {
+    const controls = [...root.querySelectorAll<HTMLElement>(selector)].filter(
+      canFocus,
+    );
+    if (controls.length === 1) {
+      control = controls[0];
+    }
+  }
+  if (control && canFocus(control)) {
+    focusControl(control, target);
   }
 }
 

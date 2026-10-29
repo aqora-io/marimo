@@ -15,6 +15,7 @@ import { initializeUIElement } from "@/core/dom/ui-element";
 import { UI_ELEMENT_REGISTRY } from "@/core/dom/uiregistry";
 import { ButtonPlugin } from "@/plugins/impl/ButtonPlugin";
 import { DropdownPlugin } from "@/plugins/impl/DropdownPlugin";
+import { RadioPlugin } from "@/plugins/impl/RadioPlugin";
 import { SliderPlugin } from "@/plugins/impl/SliderPlugin";
 import { TextAreaPlugin } from "@/plugins/impl/TextAreaPlugin";
 import { TextInputPlugin } from "@/plugins/impl/TextInputPlugin";
@@ -33,6 +34,7 @@ beforeAll(() => {
   registerReactComponent(new SliderPlugin());
   registerReactComponent(new ButtonPlugin());
   registerReactComponent(new DropdownPlugin());
+  registerReactComponent(new RadioPlugin());
 });
 
 beforeEach(() => {
@@ -350,5 +352,116 @@ describe("embedded input handoff", () => {
       expect(UI_ELEMENT_REGISTRY.lookupValue(OBJECT_ID)).toEqual(["second"]),
     );
     expect(shadow.querySelector("select")?.value).toBe("second");
+  });
+  it("restores keyboard focus to a button without activating it", async () => {
+    const { shadow } = await mount("marimo-button", {
+      initialValue: 0,
+      label: "Run",
+      kind: "neutral",
+    });
+    const ready = vi.fn();
+    document.addEventListener(MarimoValueReadyEvent.TYPE, ready);
+    try {
+      send({ message: "focus", testid: "marimo-plugin-button" });
+      expect(shadow.activeElement).toBe(shadow.querySelector("button"));
+      expect(UI_ELEMENT_REGISTRY.lookupValue(OBJECT_ID)).toBe(0);
+      expect(ready).not.toHaveBeenCalled();
+    } finally {
+      document.removeEventListener(MarimoValueReadyEvent.TYPE, ready);
+    }
+  });
+
+  it.each(["marimo-text", "marimo-text-area"])(
+    "restores %s focus and caret without replacing its current value",
+    async (tag) => {
+      const { shadow } = await mount(tag, textData());
+      const field = shadow.querySelector("input, textarea");
+      if (
+        !(
+          field instanceof HTMLInputElement ||
+          field instanceof HTMLTextAreaElement
+        )
+      ) {
+        throw new Error("Missing text field");
+      }
+      send({
+        message: "focus",
+        value: "must not overwrite",
+        selectionStart: 1,
+        selectionEnd: 4,
+      });
+      expect(shadow.activeElement).toBe(field);
+      expect(field.value).toBe("initial");
+      expect([field.selectionStart, field.selectionEnd]).toEqual([1, 4]);
+      expect(UI_ELEMENT_REGISTRY.lookupValue(OBJECT_ID)).toBe("initial");
+    },
+  );
+
+  it("focuses the live slider without changing its value", async () => {
+    const { shadow } = await mount("marimo-slider", sliderData());
+    send({ message: "focus", testid: "thumb" });
+    expect(shadow.activeElement).toBe(shadow.querySelector("[role=slider]"));
+    expect(UI_ELEMENT_REGISTRY.lookupValue(OBJECT_ID)).toBe(4);
+  });
+
+  it("focuses a select without changing its selection", async () => {
+    const { shadow } = await mount("marimo-dropdown", {
+      initialValue: ["first"],
+      label: null,
+      options: ["first", "second"],
+      allowSelectNone: false,
+    });
+    send({ message: "focus" });
+    expect(shadow.activeElement).toBe(shadow.querySelector("select"));
+    expect(UI_ELEMENT_REGISTRY.lookupValue(OBJECT_ID)).toEqual(["first"]);
+  });
+
+  it("ignores disabled controls and focus requests from unrelated windows", async () => {
+    const { shadow } = await mount("marimo-button", {
+      initialValue: 0,
+      label: "Run",
+      kind: "neutral",
+      disabled: true,
+    });
+    send({ message: "focus", testid: "marimo-plugin-button" });
+    expect(shadow.activeElement).toBeNull();
+    send({ message: "focus" }, window);
+    expect(shadow.activeElement).toBeNull();
+    expect(UI_ELEMENT_REGISTRY.lookupValue(OBJECT_ID)).toBe(0);
+  });
+  it("resolves a radio button by value without selecting it", async () => {
+    const { shadow } = await mount("marimo-radio", {
+      initialValue: "first",
+      label: null,
+      options: ["first", "second"],
+    });
+    send({ message: "focus", value: "second" });
+    expect(shadow.activeElement).toBe(
+      shadow.querySelector('button[value="second"]'),
+    );
+    expect(UI_ELEMENT_REGISTRY.lookupValue(OBJECT_ID)).toBe("first");
+  });
+
+  it("rejects unrelated-window focus requests on an enabled button", async () => {
+    const { shadow } = await mount("marimo-button", {
+      initialValue: 0,
+      label: "Run",
+      kind: "neutral",
+    });
+    send({ message: "focus", testid: "marimo-plugin-button" }, window);
+    expect(shadow.activeElement).toBeNull();
+    expect(UI_ELEMENT_REGISTRY.lookupValue(OBJECT_ID)).toBe(0);
+  });
+
+  it("distinguishes a slider's native value input from its thumb during focus restoration", async () => {
+    const { shadow } = await mount(
+      "marimo-slider",
+      sliderData({ includeInput: true }),
+    );
+    send({ message: "focus", value: "4" });
+    expect(shadow.activeElement).toBe(
+      shadow.querySelector('input:not([style*="display: none"])'),
+    );
+    expect(UI_ELEMENT_REGISTRY.lookupValue(OBJECT_ID)).toBe(4);
   });
 });
