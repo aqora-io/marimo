@@ -183,7 +183,9 @@ def sync(
     )
     if request is not None:
         try:
-            preferred = uv(request, env=env, cwd=cwd, timeout=5)
+            preferred = uv(
+                request, env=env, cwd=cwd, timeout=5, on_command=on_command
+            )
         except (UvError, subprocess.TimeoutExpired):
             pass
         else:
@@ -219,7 +221,9 @@ async def sync_async(
     )
     if request is not None:
         try:
-            preferred = await uv_async(request, env=env, cwd=cwd, timeout=5)
+            preferred = await uv_async(
+                request, env=env, cwd=cwd, timeout=5, on_command=on_command
+            )
         except (UvError, asyncio.TimeoutError):
             pass
         else:
