@@ -17,6 +17,7 @@ import React, {
   Suspense,
   useEffect,
   useImperativeHandle,
+  useLayoutEffect,
   useMemo,
   useState,
 } from "react";
@@ -29,6 +30,7 @@ import { HTMLCellId } from "@/core/cells/ids.ts";
 import { isUninstantiated } from "@/core/cells/utils";
 import { createInputEvent, MarimoValueUpdateEvent } from "@/core/dom/events";
 import { getUIElementObjectId } from "@/core/dom/ui-element";
+import { setReactRootPending } from "@/core/dom/react-root-readiness";
 import { UIElementRegistry } from "@/core/dom/uiregistry";
 import { FUNCTIONS_REGISTRY } from "@/core/functions/FunctionRegistry";
 import { LocaleProvider } from "@/core/i18n/locale-provider";
@@ -269,11 +271,15 @@ function PluginSlotInternal<T>(
 
   // If we failed to parse the initial value, render an error
   if (!parsedResult.success) {
-    return renderError(
-      parsedResult.error,
-      Objects.mapValues(hostElement.dataset, (value) =>
-        typeof value === "string" ? parseAttrValue(value) : value,
-      ),
+    return (
+      <PluginReady host={hostElement}>
+        {renderError(
+          parsedResult.error,
+          Objects.mapValues(hostElement.dataset, (value) =>
+            typeof value === "string" ? parseAttrValue(value) : value,
+          ),
+        )}
+      </PluginReady>
     );
   }
 
@@ -283,19 +289,31 @@ function PluginSlotInternal<T>(
       <div className={`contents ${theme}`}>
         <Suspense fallback={<div />}>
           <TooltipProvider>
-            {plugin.render({
-              setValue: setValueAndSendInput,
-              value,
-              data: parsedResult.data,
-              children: childNodes,
-              host: hostElement,
-              functions: functionMethods,
-            })}
+            <PluginReady host={hostElement}>
+              {plugin.render({
+                setValue: setValueAndSendInput,
+                value,
+                data: parsedResult.data,
+                children: childNodes,
+                host: hostElement,
+                functions: functionMethods,
+              })}
+            </PluginReady>
           </TooltipProvider>
         </Suspense>
       </div>
     </StyleNamespace>
   );
+}
+
+function PluginReady({
+  host,
+  children,
+}: React.PropsWithChildren<{ host: HTMLElement }>) {
+  useLayoutEffect(() => {
+    setReactRootPending(host, false);
+  }, [host]);
+  return children;
 }
 
 const PluginSlot: React.ForwardRefExoticComponent<
@@ -368,7 +386,25 @@ export function registerReactComponent<T>(plugin: IPlugin<T, unknown>): void {
           // handle the descendants unmounting.
           this.root.unmount();
         }
-        this.root = ReactDOM.createRoot(this.shadowRoot);
+        this.root = ReactDOM.createRoot(this.shadowRoot, {
+          onUncaughtError: (error) => {
+            // A failed root unmounts its contents but leaves this host connected.
+            setReactRootPending(this, false);
+            if (typeof reportError === "function") {
+              reportError(error);
+            } else {
+              const event = new ErrorEvent("error", {
+                error,
+                message: error instanceof Error ? error.message : String(error),
+                bubbles: true,
+                cancelable: true,
+              });
+              if (window.dispatchEvent(event)) {
+                Logger.error(error);
+              }
+            }
+          },
+        });
 
         // Render the component for the first time
         this.mountReactComponent();
@@ -384,6 +420,7 @@ export function registerReactComponent<T>(plugin: IPlugin<T, unknown>): void {
     }
 
     public disconnectedCallback() {
+      setReactRootPending(this, false);
       this.observer.disconnect();
       this.root?.unmount();
       if (this.mounted) {
@@ -458,6 +495,7 @@ export function registerReactComponent<T>(plugin: IPlugin<T, unknown>): void {
      */
     private async mountReactComponent() {
       this.mounted = true;
+      setReactRootPending(this, true);
 
       invariant(this.root, "Root must be defined");
       this.root.render(

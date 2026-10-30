@@ -11,14 +11,18 @@ same one `uv run` uses.
 
 from __future__ import annotations
 
+import asyncio
 import os
 import re
+import subprocess
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
 import msgspec
 
 from marimo import _loggers
+from marimo._environments import script_metadata
 from marimo._environments.uv import (
     UvError,
     require_uv_bin,
@@ -174,6 +178,19 @@ def sync(
     """
     ensure_supported_uv()
     args, env = _sync_command(script, python_override, active_environment)
+    request = _preferred_system_python_request(
+        script, python_override, active_environment, cwd=cwd
+    )
+    if request is not None:
+        try:
+            preferred = uv(
+                request, env=env, cwd=cwd, timeout=5, on_command=on_command
+            )
+        except (UvError, subprocess.TimeoutExpired):
+            pass
+        else:
+            if python := preferred.stdout.strip():
+                args.extend(["--python", python])
     if on_output is not None:
         completed = uv_stream(
             args,
@@ -199,10 +216,52 @@ async def sync_async(
     """Synchronize without blocking; cancellation stops uv before returning."""
     await ensure_supported_uv_async()
     args, env = _sync_command(script, python_override, active_environment)
+    request = _preferred_system_python_request(
+        script, python_override, active_environment, cwd=cwd
+    )
+    if request is not None:
+        try:
+            preferred = await uv_async(
+                request, env=env, cwd=cwd, timeout=5, on_command=on_command
+            )
+        except (UvError, asyncio.TimeoutError):
+            pass
+        else:
+            if python := preferred.stdout.strip():
+                args.extend(["--python", python])
     completed = await uv_async(
         args, env=env, cwd=cwd, on_output=on_output, on_command=on_command
     )
     return _parse_report(completed.stdout)
+
+
+def _preferred_system_python_request(
+    script: str,
+    python_override: str | None,
+    active_environment: Environment | None,
+    *,
+    cwd: str | None,
+) -> list[str] | None:
+    # uv otherwise reuses any compatible cached interpreter, even when the
+    # operator prefers a system interpreter with better package-wheel support.
+    if (
+        os.environ.get("UV_PYTHON_PREFERENCE") != "system"
+        or os.environ.get("UV_PYTHON")
+        or python_override is not None
+        or active_environment is not None
+    ):
+        return None
+    try:
+        path = Path(script)
+        if cwd is not None and not path.is_absolute():
+            path = Path(cwd) / path
+        project = script_metadata.loads(path.read_text("utf-8"))
+    except (OSError, ValueError):
+        return None
+    requirement = project.get("requires-python") if project else None
+    if not isinstance(requirement, str) or not requirement:
+        return None
+    return ["python", "find", "--system", requirement]
 
 
 def _sync_command(

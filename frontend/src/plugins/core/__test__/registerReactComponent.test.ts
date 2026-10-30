@@ -157,7 +157,7 @@ describe("connectedCallback - light DOM nesting detection", () => {
     // Only the parent should mount; the child is skipped because it
     // detects a marimo ancestor in the light DOM.
     expect(createRootSpy).toHaveBeenCalledTimes(1);
-    expect(createRootSpy).toHaveBeenCalledWith(parent.shadowRoot);
+    expect(createRootSpy.mock.calls[0][0]).toBe(parent.shadowRoot);
 
     parent.remove();
   });
@@ -172,7 +172,7 @@ describe("connectedCallback - light DOM nesting detection", () => {
     document.body.append(el);
 
     expect(createRootSpy).toHaveBeenCalledTimes(1);
-    expect(createRootSpy).toHaveBeenCalledWith(el.shadowRoot);
+    expect(createRootSpy.mock.calls[0][0]).toBe(el.shadowRoot);
 
     el.remove();
   });
@@ -189,7 +189,7 @@ describe("connectedCallback - light DOM nesting detection", () => {
     document.body.append(wrapper);
 
     expect(createRootSpy).toHaveBeenCalledTimes(1);
-    expect(createRootSpy).toHaveBeenCalledWith(el.shadowRoot);
+    expect(createRootSpy.mock.calls[0][0]).toBe(el.shadowRoot);
 
     wrapper.remove();
   });
@@ -214,7 +214,7 @@ describe("connectedCallback - light DOM nesting detection", () => {
     // Only outer mounts; inner is skipped because a marimo ancestor
     // is found when traversing through the intermediate div.
     expect(createRootSpy).toHaveBeenCalledTimes(1);
-    expect(createRootSpy).toHaveBeenCalledWith(outer.shadowRoot);
+    expect(createRootSpy.mock.calls[0][0]).toBe(outer.shadowRoot);
 
     outer.remove();
   });

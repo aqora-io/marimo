@@ -2,12 +2,26 @@ import { notebookAtom, type NotebookState } from "@/core/cells/cells";
 import { SCRATCH_CELL_ID } from "@/core/cells/ids";
 import { connectionAtom } from "@/core/network/connection";
 import { Logger } from "@/utils/Logger";
-import { atom, useStore } from "jotai";
-import { useEffect, useRef } from "react";
+import { atom, useAtomValue, useStore } from "jotai";
+import {
+  containsComposedNode,
+  pendingReactRootsAtom,
+} from "@/core/dom/react-root-readiness";
+import { store as pluginStore } from "@/core/state/jotai";
+import { useEffect, useLayoutEffect, useRef } from "react";
 
-export function useResponsiveEmbedRef<T extends HTMLElement>() {
+export function useResponsiveEmbedRef<T extends HTMLElement>(visible = true) {
   const ref = useRef<T>(null);
   const store = useStore();
+  const readiness = useAtomValue(readinessAtom);
+  const pendingRoots = useAtomValue(pendingReactRootsAtom, {
+    store: pluginStore,
+  });
+  const committed = useRef({ readiness, visible });
+  const publish = useRef<(() => void) | undefined>(undefined);
+  useLayoutEffect(() => {
+    committed.current = { readiness, visible };
+  }, [readiness, visible]);
 
   useEffect(() => {
     if (window.parent === window) {
@@ -18,8 +32,6 @@ export function useResponsiveEmbedRef<T extends HTMLElement>() {
     if (!root) {
       return;
     }
-
-    let unsub: (() => void) | undefined;
 
     const measureHeight = () => {
       // const children: HTMLElement[] = Array.prototype.slice.call(root.children);
@@ -45,6 +57,9 @@ export function useResponsiveEmbedRef<T extends HTMLElement>() {
     });
 
     const onWindowMessage = (event: MessageEvent<unknown>) => {
+      if (event.source !== window.parent) {
+        return;
+      }
       if (event.data === "hello") {
         window.parent.postMessage(
           { message: "hello", height: measureHeight() },
@@ -52,16 +67,25 @@ export function useResponsiveEmbedRef<T extends HTMLElement>() {
         );
         ro.observe(root);
         mo.observe(root, { childList: true, subtree: true });
-        unsub?.();
-        unsub = store.sub(readinessAtom, () => {
-          const readiness = store.get(readinessAtom);
-          window.parent.postMessage(readiness, "*");
-        });
+        publish.current = () => {
+          const current = store.get(readinessAtom);
+          const { readiness, visible } = committed.current;
+          const pending = [...pluginStore.get(pendingReactRootsAtom)].some(
+            (element) => containsComposedNode(root, element),
+          );
+          window.parent.postMessage(
+            current === "ready" &&
+              (readiness !== "ready" || !visible || pending)
+              ? "running"
+              : current,
+            event.origin,
+          );
+        };
+        publish.current();
       } else if (event.data === "bye") {
         mo.disconnect();
         ro.disconnect();
-        unsub?.();
-        unsub = undefined;
+        publish.current = undefined;
       } else {
         Logger.error(
           `Invalid message=${JSON.stringify(event.data)} from origin=${event.origin}`,
@@ -74,9 +98,13 @@ export function useResponsiveEmbedRef<T extends HTMLElement>() {
       window.removeEventListener("message", onWindowMessage);
       mo.disconnect();
       ro.disconnect();
-      unsub?.();
+      publish.current = undefined;
     };
-  }, []);
+  }, [store]);
+
+  useEffect(() => {
+    publish.current?.();
+  }, [readiness, visible, pendingRoots]);
 
   return ref;
 }
