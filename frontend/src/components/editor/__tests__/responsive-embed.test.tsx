@@ -1,5 +1,8 @@
+import { createElement, use } from "react";
+import { z } from "zod";
+import { registerReactComponent } from "@/plugins/core/registerReactComponent";
 import { act, render } from "@testing-library/react";
-import { createStore, Provider } from "jotai";
+import { createStore, Provider, useAtomValue } from "jotai";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MockNotebook } from "@/__mocks__/notebook";
 import { cellId } from "@/__tests__/branded";
@@ -90,3 +93,162 @@ describe("responsive embed handshake", () => {
     expect(postMessage).not.toHaveBeenCalled();
   });
 });
+
+describe("committed embed readiness", () => {
+  it("does not publish ready while completed notebook content is hidden", () => {
+    const { store, completed, postMessage, send, view } = setup();
+    view.rerender(
+      <Provider store={store}>
+        <HiddenNotebook />
+      </Provider>,
+    );
+    send("hello");
+    act(() => {
+      store.set(connectionAtom, { state: "OPEN" });
+      store.set(notebookAtom, completed);
+    });
+    expect(postMessage.mock.calls.map(([message]) => message)).not.toContain(
+      "ready",
+    );
+    view.rerender(
+      <Provider store={store}>
+        <HiddenNotebook visible={true} />
+      </Provider>,
+    );
+    expect(postMessage.mock.calls.at(-1)?.[0]).toBe("ready");
+  });
+
+  it("waits for a React plugin's content instead of its Suspense fallback", async () => {
+    const { promise, resolve } = Promise.withResolvers<boolean>();
+    const tag = "marimo-readiness-test-plugin";
+    function AsyncButton() {
+      use(promise);
+      return <button type="button">Committed plugin</button>;
+    }
+    registerReactComponent({
+      tagName: tag,
+      validator: z.any(),
+      render: () => <AsyncButton />,
+    });
+    const { store, postMessage, send, view } = setup(true);
+    view.rerender(
+      <Provider store={store}>
+        <NotebookPlugin tag={tag} />
+      </Provider>,
+    );
+    send("hello");
+    expect(postMessage.mock.calls.map(([message]) => message)).not.toContain(
+      "ready",
+    );
+    await act(async () => resolve(true));
+    expect(postMessage.mock.calls.at(-1)?.[0]).toBe("ready");
+    const host = view.container.querySelector(tag);
+    expect(host?.shadowRoot?.querySelector("button")?.textContent).toBe(
+      "Committed plugin",
+    );
+    view.unmount();
+  });
+
+  it("waits for nested shadow-root plugins and releases disconnected roots", async () => {
+    const { promise, resolve } = Promise.withResolvers<boolean>();
+    const inner = "marimo-readiness-nested-plugin";
+    const outer = "marimo-readiness-parent-plugin";
+    function AsyncButton() {
+      use(promise);
+      return <button type="button">Nested control</button>;
+    }
+    registerReactComponent({
+      tagName: inner,
+      validator: z.any(),
+      render: () => <AsyncButton />,
+    });
+    registerReactComponent({
+      tagName: outer,
+      validator: z.any(),
+      render: () => createElement(inner),
+    });
+    const { store, postMessage, send, view } = setup(true);
+    view.rerender(
+      <Provider store={store}>
+        <NotebookPlugin tag={outer} />
+      </Provider>,
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+    send("hello");
+    expect(
+      view.container.querySelector(outer)?.shadowRoot?.querySelector(inner),
+    ).not.toBeNull();
+    expect(postMessage.mock.calls.map(([message]) => message)).not.toContain(
+      "ready",
+    );
+    view.rerender(
+      <Provider store={store}>
+        <NotebookPlugin />
+      </Provider>,
+    );
+    expect(postMessage.mock.calls.at(-1)?.[0]).toBe("ready");
+    await act(async () => resolve(true));
+    view.unmount();
+  });
+
+  it("does not replay stale ready between a disconnect and its React commit", () => {
+    const { store, postMessage, send } = setup(true);
+    send("hello");
+    postMessage.mockClear();
+    act(() => {
+      store.set(connectionAtom, { state: "CONNECTING" });
+      send("hello");
+    });
+    expect(postMessage.mock.calls.map(([message]) => message)).not.toContain(
+      "ready",
+    );
+  });
+
+  it("publishes ready after the output DOM is committed", () => {
+    const { store, completed, postMessage, send, view } = setup();
+    view.rerender(
+      <Provider store={store}>
+        <NotebookOutput />
+      </Provider>,
+    );
+    send("hello");
+    expect(view.container.querySelector("h1")).toBeNull();
+    const committed: boolean[] = [];
+    postMessage.mockImplementation((message) => {
+      if (message === "ready") {
+        committed.push(!!view.container.querySelector("h1"));
+      }
+    });
+    act(() => {
+      store.set(connectionAtom, { state: "OPEN" });
+      store.set(notebookAtom, completed);
+    });
+    expect(committed).toEqual([true]);
+  });
+});
+
+function HiddenNotebook({ visible = false }: { visible?: boolean }) {
+  const ref = useResponsiveEmbedRef<HTMLDivElement>(visible);
+  return (
+    <div ref={ref}>
+      <div hidden={!visible}>Notebook</div>
+    </div>
+  );
+}
+
+function NotebookOutput() {
+  const notebook = useAtomValue(notebookAtom);
+  const ref = useResponsiveEmbedRef<HTMLDivElement>();
+  return (
+    <div ref={ref}>
+      {notebook.cellRuntime[cellId("cell")] && <h1>Output</h1>}
+    </div>
+  );
+}
+
+function NotebookPlugin({ tag }: { tag?: string }) {
+  const ref = useResponsiveEmbedRef<HTMLDivElement>();
+  return <div ref={ref}>{tag && createElement(tag)}</div>;
+}

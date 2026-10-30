@@ -21,7 +21,7 @@ export const VerticalLayoutWrapper: React.FC<PropsWithChildren<Props>> = ({
   children,
   innerClassName,
 }) => {
-  const ref = useResponsiveEmbedRef<HTMLDivElement>();
+  const ref = useResponsiveEmbedRef<HTMLDivElement>(!invisible);
   const width = getAppWidth(appConfig, mode);
   return (
     <div
@@ -40,10 +40,9 @@ export const VerticalLayoutWrapper: React.FC<PropsWithChildren<Props>> = ({
           "m-auto",
           // // This padding needs to be the same from above to be correctly applied
           // "pb-24 sm:pb-12",
-          width === "compact" &&
-          "max-w-(--content-width) sm:min-w-[400px]",
+          width === "compact" && "max-w-(--content-width) sm:min-w-[400px]",
           width === "medium" &&
-          "max-w-(--content-width-medium) sm:min-w-[400px]",
+            "max-w-(--content-width-medium) sm:min-w-[400px]",
           width === "columns" && "w-fit",
           width === "full" && "max-w-full",
           // Hide the cells for a fake loading effect, to avoid flickering
