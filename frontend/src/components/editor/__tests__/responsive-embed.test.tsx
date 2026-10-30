@@ -54,7 +54,10 @@ function setup(ready = false) {
   return { store, completed, postMessage, send, view };
 }
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 
 describe("responsive embed handshake", () => {
   it("replays readiness when the notebook completed before hello", () => {
@@ -205,6 +208,43 @@ describe("committed embed readiness", () => {
       "ready",
     );
   });
+
+  it.each(["native", "event"])(
+    "releases a failed plugin root and preserves its %s error report",
+    async (reporter) => {
+      const failure = new Error("Plugin render failed");
+      const tag = `marimo-readiness-failing-${reporter}-plugin`;
+      registerReactComponent({
+        tagName: tag,
+        validator: z.any(),
+        render: () => {
+          throw failure;
+        },
+      });
+      const reported: unknown[] = [];
+      if (reporter === "native") {
+        vi.stubGlobal("reportError", (error: unknown) => reported.push(error));
+      }
+      const dispatch = window.dispatchEvent.bind(window);
+      vi.spyOn(window, "dispatchEvent").mockImplementation((event) => {
+        if (event instanceof ErrorEvent && event.error === failure) {
+          reported.push(event.error);
+          return false;
+        }
+        return dispatch(event);
+      });
+      const { send, postMessage, view } = setup(true);
+      const host = view.container.firstElementChild;
+      expect(host).not.toBeNull();
+      // Exercise the real root's uncaught path, which React's act deliberately replaces.
+      host?.append(document.createElement(tag));
+      await vi.waitFor(() => expect(reported).toEqual([failure]));
+      send("hello");
+      expect(postMessage.mock.calls.at(-1)?.[0]).toBe("ready");
+      expect(view.container.querySelector(tag)?.isConnected).toBe(true);
+      view.unmount();
+    },
+  );
 
   it("publishes ready after the output DOM is committed", () => {
     const { store, completed, postMessage, send, view } = setup();

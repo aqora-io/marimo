@@ -386,7 +386,25 @@ export function registerReactComponent<T>(plugin: IPlugin<T, unknown>): void {
           // handle the descendants unmounting.
           this.root.unmount();
         }
-        this.root = ReactDOM.createRoot(this.shadowRoot);
+        this.root = ReactDOM.createRoot(this.shadowRoot, {
+          onUncaughtError: (error) => {
+            // A failed root unmounts its contents but leaves this host connected.
+            setReactRootPending(this, false);
+            if (typeof reportError === "function") {
+              reportError(error);
+            } else {
+              const event = new ErrorEvent("error", {
+                error,
+                message: error instanceof Error ? error.message : String(error),
+                bubbles: true,
+                cancelable: true,
+              });
+              if (window.dispatchEvent(event)) {
+                Logger.error(error);
+              }
+            }
+          },
+        });
 
         // Render the component for the first time
         this.mountReactComponent();
